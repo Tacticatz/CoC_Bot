@@ -123,6 +123,27 @@ if ($choice.ToLower() -eq 'y') {
     Start-Process "https://www.bluestacks.com/download.html"
 }
 
+# 7. Create start_bot.bat in bot folder and user's Documents folder
+Write-Host ""
+Write-Host "[7/7] Erstelle Autostart-Skripte..." -ForegroundColor Yellow
+$batContent = @"
+@echo off
+cd /d "$currentDir"
+start "" ".venv\Scripts\python.exe" "app/app.py"
+"@
+
+# Save in project directory
+$localBat = Join-Path $currentDir "start_bot.bat"
+$batContent | Out-File -FilePath $localBat -Encoding ascii
+
+# Save copy in user's Documents directory
+$documentsFolder = [System.Environment]::GetFolderPath("MyDocuments")
+if (Test-Path $documentsFolder) {
+    $docsBat = Join-Path $documentsFolder "start_bot.bat"
+    $batContent | Out-File -FilePath $docsBat -Encoding ascii
+    Write-Host "start_bot.bat in deinem Dokumente-Ordner erstellt ($docsBat)" -ForegroundColor Green
+}
+
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "   SETUP ERFOLGREICH ABGESCHLOSSEN!      " -ForegroundColor Green
