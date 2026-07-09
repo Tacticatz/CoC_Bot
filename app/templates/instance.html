@@ -37,11 +37,24 @@
         <!-- Bot Script Process Controller -->
         <div class="notifications" style="margin-bottom: 25px; border-color: var(--accent);">
             <h1 class="notifications_title" style="background-color: rgba(124, 58, 237, 0.15);"><i class="fas fa-robot"></i> Bot Steuerung</h1>
-            <div style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span class="themed_text" style="font-size: 1.4em;">Status:</span>
-                    <span id="bot-process-status" class="themed_text" style="font-size: 1.4em; font-weight: bold; color: var(--danger);"><i class="fas fa-circle-notch fa-spin"></i> Pruefe...</span>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                
+                <!-- Status List -->
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; font-size: 1.3em;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                        <span class="themed_text">Skript-Prozess (Python):</span>
+                        <strong id="bot-process-status" style="color: var(--danger);"><i class="fas fa-circle-notch fa-spin"></i> Pruefe...</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                        <span class="themed_text">BlueStacks Emulator:</span>
+                        <strong id="bot-emulator-status" style="color: var(--danger);"><i class="fas fa-circle-notch fa-spin"></i> Pruefe...</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-bottom: 6px;">
+                        <span class="themed_text">ADB Verbindung:</span>
+                        <strong id="bot-adb-status" style="color: var(--danger);"><i class="fas fa-circle-notch fa-spin"></i> Pruefe...</strong>
+                    </div>
                 </div>
+
                 <button type="button" id="bot-control-btn" onclick="toggleBotProcess()" class="btn" style="width: 100%; font-size: 1.6em; padding: 12px; background-color: var(--accent); border-radius: 12px; border: none; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px var(--shadow);">
                     Bot starten
                 </button>
@@ -556,10 +569,13 @@
                     botIsRunning = data.running;
                     
                     const statusText = document.getElementById("bot-process-status");
+                    const emuText = document.getElementById("bot-emulator-status");
+                    const adbText = document.getElementById("bot-adb-status");
                     const btn = document.getElementById("bot-control-btn");
                     
+                    // 1. Script Process Status
                     if (botIsRunning) {
-                        statusText.innerText = "Aktiv (laeuft)";
+                        statusText.innerText = "Aktiv";
                         statusText.style.color = "var(--success)";
                         btn.innerText = "Bot stoppen";
                         btn.style.backgroundColor = "var(--danger)";
@@ -568,6 +584,24 @@
                         statusText.style.color = "var(--danger)";
                         btn.innerText = "Bot starten";
                         btn.style.backgroundColor = "var(--accent)";
+                    }
+                    
+                    // 2. BlueStacks Emulator Status
+                    if (data.emulator_running) {
+                        emuText.innerText = "Laeuft";
+                        emuText.style.color = "var(--success)";
+                    } else {
+                        emuText.innerText = "Gestoppt";
+                        emuText.style.color = "var(--danger)";
+                    }
+                    
+                    // 3. ADB Link Status
+                    if (data.adb_connected) {
+                        adbText.innerText = "Verbunden";
+                        adbText.style.color = "var(--success)";
+                    } else {
+                        adbText.innerText = "Getrennt";
+                        adbText.style.color = "var(--danger)";
                     }
                 } catch (err) {
                     console.error("Fehler beim Abrufen des Bot-Status:", err);

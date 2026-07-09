@@ -486,9 +486,41 @@ def stop_bot(id):
 
 @app.route("/<id>/bot_status", methods=["GET"])
 def get_bot_status(id):
+    instance = instances.get(id)
+    if not instance: abort(404)
+    
+    # 1. Check Python Bot Script process status
     proc, _ = bot_processes.get(id, (None, None))
-    is_running = proc is not None and proc.poll() is None
-    return jsonify({"running": is_running})
+    bot_running = proc is not None and proc.poll() is None
+    
+    # 2. Check if BlueStacks Player is running
+    import subprocess
+    emulator_running = False
+    try:
+        proc_check = subprocess.run(["tasklist", "/FI", "IMAGENAME eq HD-Player.exe"], capture_output=True, text=True, errors="ignore")
+        emulator_running = "HD-Player.exe" in proc_check.stdout
+    except:
+        pass
+        
+    # 3. Check if ADB is connected to this instance
+    adb_connected = False
+    try:
+        adb_addr = instance.adb_address
+        proc_check = subprocess.run(["adb", "devices"], capture_output=True, text=True, errors="ignore")
+        if adb_addr in proc_check.stdout:
+            lines = proc_check.stdout.splitlines()
+            for line in lines:
+                if adb_addr in line and "device" in line:
+                    adb_connected = True
+                    break
+    except:
+        pass
+        
+    return jsonify({
+        "running": bot_running,
+        "emulator_running": emulator_running,
+        "adb_connected": adb_connected
+    })
 
 @app.route("/<id>/bot_log", methods=["GET"])
 def get_bot_log(id):
