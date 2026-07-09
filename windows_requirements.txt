@@ -1,0 +1,13 @@
+REM Windows 11 specific dependencies (in addition to src/requirements.txt and app/requirements.txt)
+
+REM GUI improvements
+pywebview>=5.0
+
+REM Windows registry access
+pywin32>=305
+
+REM Windows process management
+psutil>=5.9.0
+
+REM System information
+wmi>=1.5.1
