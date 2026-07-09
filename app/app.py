@@ -26,6 +26,9 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "cocbot-secret-key-12345")
 CORS(app)
 
+# Global tracker for running bot script processes
+bot_processes = {}
+
 class Instance:
     def __init__(
         self,
@@ -418,6 +421,100 @@ def remote_keyevent(id):
     adb_addr = instance.adb_address
     subprocess.run(["adb", "-s", adb_addr, "shell", "input", "keyevent", str(key)])
     return jsonify({"status": "success"})
+
+@app.route("/<id>/start_bot", methods=["POST"])
+def start_bot(id):
+    global bot_processes
+    if id not in instances: abort(404)
+    
+    # Check if already running
+    proc, _ = bot_processes.get(id, (None, None))
+    if proc is not None and proc.poll() is None:
+        return jsonify({"status": "error", "message": "Bot is already running"}), 400
+        
+    import subprocess, sys
+    python_path = str(PATH.parent / ".venv" / "Scripts" / "python.exe")
+    if sys.platform != "win32":
+        python_path = str(PATH.parent / ".venv" / "bin" / "python")
+        
+    main_py = str(PATH.parent / "src" / "main.py")
+    
+    log_dir = PATH.parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_file_path = log_dir / f"{id}.log"
+    
+    # Clear old log files to keep them readable
+    try:
+        if log_file_path.exists():
+            log_file_path.write_text("")
+    except:
+        pass
+        
+    try:
+        log_file = open(log_file_path, "a", encoding="utf-8")
+        
+        # Start bot as a decoupled subprocess
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+        new_proc = subprocess.Popen(
+            [python_path, main_py, "--id", id, "--gui", "False"],
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            cwd=str(PATH.parent),
+            creationflags=creation_flags
+        )
+        bot_processes[id] = (new_proc, log_file)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to start process: {str(e)}"}), 500
+
+@app.route("/<id>/stop_bot", methods=["POST"])
+def stop_bot(id):
+    global bot_processes
+    proc, log_file = bot_processes.pop(id, (None, None))
+    if proc:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+        except:
+            try: proc.kill()
+            except: pass
+        if log_file:
+            try: log_file.close()
+            except: pass
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Bot is not running"}), 400
+
+@app.route("/<id>/bot_status", methods=["GET"])
+def get_bot_status(id):
+    proc, _ = bot_processes.get(id, (None, None))
+    is_running = proc is not None and proc.poll() is None
+    return jsonify({"running": is_running})
+
+@app.route("/<id>/bot_log", methods=["GET"])
+def get_bot_log(id):
+    log_path = PATH.parent / "logs" / f"{id}.log"
+    if not log_path.exists():
+        return jsonify({"log": "Kein Log vorhanden. Starte den Bot zuerst!"})
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        # Return last 45 lines to keep payload clean
+        return jsonify({"log": "".join(lines[-45:])})
+    except Exception as e:
+        return jsonify({"log": f"Log-Fehler: {str(e)}"})
+
+import atexit
+def cleanup_bot_processes():
+    global bot_processes
+    for id in list(bot_processes.keys()):
+        proc, log_file = bot_processes.pop(id, (None, None))
+        if proc:
+            try:
+                proc.terminate()
+                if log_file: log_file.close()
+            except:
+                pass
+atexit.register(cleanup_bot_processes)
 
 @app.after_request
 def add_cache_headers(response):

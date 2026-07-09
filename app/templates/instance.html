@@ -34,6 +34,20 @@
             <strong class="themed_text" id="run_status" style="font-size:1.5em; padding:0;"></strong>
         </div>
 
+        <!-- Bot Script Process Controller -->
+        <div class="notifications" style="margin-bottom: 25px; border-color: var(--accent);">
+            <h1 class="notifications_title" style="background-color: rgba(124, 58, 237, 0.15);"><i class="fas fa-robot"></i> Bot Steuerung</h1>
+            <div style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="themed_text" style="font-size: 1.4em;">Status:</span>
+                    <span id="bot-process-status" class="themed_text" style="font-size: 1.4em; font-weight: bold; color: var(--danger);"><i class="fas fa-circle-notch fa-spin"></i> Pruefe...</span>
+                </div>
+                <button type="button" id="bot-control-btn" onclick="toggleBotProcess()" class="btn" style="width: 100%; font-size: 1.6em; padding: 12px; background-color: var(--accent); border-radius: 12px; border: none; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px var(--shadow);">
+                    Bot starten
+                </button>
+            </div>
+        </div>
+
         <form method="POST" class="stacked-buttons">
             <button type="submit" name="time" value="5">5 min</button>
             <button type="submit" name="time" value="15">15 min</button>
@@ -78,6 +92,14 @@
                         <button type="button" onclick="sendRemoteKey(3)" style="flex: 1; padding: 10px; font-size: 1.2em; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: var(--text); cursor: pointer;"><i class="fas fa-home"></i> Home</button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Live Console Logs Section -->
+        <div id="live-console-panel" class="exclusions" style="margin-top:30px; border-color: rgba(255,255,255,0.05);">
+            <h1 class="exclusions_title" style="background-color: rgba(0,0,0,0.15);"><i class="fas fa-terminal"></i> Bot Konsole</h1>
+            <div style="padding: 15px;">
+                <textarea id="bot-console-log" readonly style="width: 100%; height: 180px; font-family: 'Courier New', monospace; font-size: 11px; background: #05070c; color: #10b981; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px; resize: none; outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);"></textarea>
             </div>
         </div>
 
@@ -523,6 +545,80 @@
                     console.error("Fehler beim Senden des Keyevents:", err);
                 }
             }
+
+            // Subprocess Control & Logs Polling
+            let botIsRunning = false;
+            
+            async function updateBotProcessStatus() {
+                try {
+                    const res = await fetch(`/${id}/bot_status`);
+                    const data = await res.json();
+                    botIsRunning = data.running;
+                    
+                    const statusText = document.getElementById("bot-process-status");
+                    const btn = document.getElementById("bot-control-btn");
+                    
+                    if (botIsRunning) {
+                        statusText.innerText = "Aktiv (laeuft)";
+                        statusText.style.color = "var(--success)";
+                        btn.innerText = "Bot stoppen";
+                        btn.style.backgroundColor = "var(--danger)";
+                    } else {
+                        statusText.innerText = "Inaktiv";
+                        statusText.style.color = "var(--danger)";
+                        btn.innerText = "Bot starten";
+                        btn.style.backgroundColor = "var(--accent)";
+                    }
+                } catch (err) {
+                    console.error("Fehler beim Abrufen des Bot-Status:", err);
+                }
+            }
+
+            async function toggleBotProcess() {
+                const btn = document.getElementById("bot-control-btn");
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = "Bitte warten...";
+                
+                const action = botIsRunning ? "stop_bot" : "start_bot";
+                try {
+                    const res = await fetch(`/${id}/${action}`, { method: "POST" });
+                    if (res.ok) {
+                        await updateBotProcessStatus();
+                        updateBotLog();
+                    } else {
+                        const data = await res.json();
+                        alert("Aktion fehlgeschlagen: " + (data.message || "Unbekannter Fehler"));
+                    }
+                } catch (err) {
+                    console.error("Fehler bei Bot-Steuerung:", err);
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function updateBotLog() {
+                try {
+                    const res = await fetch(`/${id}/bot_log`);
+                    const data = await res.json();
+                    const consoleLog = document.getElementById("bot-console-log");
+                    
+                    // Keep scroll at bottom if user hasn't scrolled up
+                    const atBottom = consoleLog.scrollHeight - consoleLog.clientHeight <= consoleLog.scrollTop + 20;
+                    consoleLog.value = data.log || "";
+                    if (atBottom) {
+                        consoleLog.scrollTop = consoleLog.scrollHeight;
+                    }
+                } catch (err) {
+                    console.error("Fehler beim Laden der Logs:", err);
+                }
+            }
+
+            // Periodic polling for status and logs
+            updateBotProcessStatus();
+            updateBotLog();
+            setInterval(updateBotProcessStatus, 3000);
+            setInterval(updateBotLog, 3000);
         </script>
         {% endif %}
     </div>

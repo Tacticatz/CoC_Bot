@@ -308,3 +308,52 @@ header h1 {
     background-color: rgba(255, 255, 255, 0.1);
     color: var(--text);
 }
+
+/* Mobile responsiveness overrides */
+@media (max-width: 600px) {
+    body {
+        padding: 15px 10px;
+    }
+    h1 {
+        font-size: 2em;
+    }
+    p {
+        font-size: 1.4em;
+    }
+    .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 5px;
+    }
+    .notifications_title, .exclusions_title {
+        font-size: 1.3em !important;
+        padding: 15px;
+    }
+    .exclusion {
+        font-size: 1.1em;
+        padding: 12px 15px;
+    }
+    .btn, .stacked-buttons button, .custom-input-form button, .cancel-button button {
+        font-size: 1.3em;
+        padding: 12px;
+        border-radius: 12px;
+    }
+    .custom-input-form input {
+        font-size: 1.3em;
+        padding: 12px;
+        border-radius: 12px;
+    }
+    .notif_data {
+        font-size: 1.05em;
+    }
+    .notif_age {
+        font-size: 0.95em;
+    }
+    #live-screen-img {
+        border-radius: 8px;
+    }
+    #bot-console-log {
+        height: 140px;
+        font-size: 9px;
+    }
+}

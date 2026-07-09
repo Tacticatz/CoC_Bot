@@ -109,8 +109,16 @@ Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "   SETUP ERFOLGREICH ABGESCHLOSSEN!      " -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
-Write-Host "Bitte oeffne ein neues Terminalfenster,"
-Write-Host "damit die PATH-Aenderungen fuer ADB wirksam werden."
-Write-Host "Starte den Bot danach mit:"
-Write-Host "  .venv\Scripts\python.exe src/main.py"
+Write-Host "Starte Web-Dashboard automatisch..." -ForegroundColor Yellow
+
+# Start the Flask web app dashboard in the background (hidden window)
+$appPath = Join-Path $currentDir "app\app.py"
+Start-Process -FilePath $venvPython -ArgumentList $appPath -WindowStyle Hidden
+
+# Wait briefly for server to boot, then open the browser
+Start-Sleep -Seconds 2
+Start-Process "http://localhost:1234"
+
+Write-Host "Dashboard erfolgreich gestartet unter http://localhost:1234" -ForegroundColor Green
+Write-Host "Viel Spass mit dem CoC Bot!" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
