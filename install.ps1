@@ -7,7 +7,7 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Check Python installation
-Write-Host "[1/6] Prüfe Python-Installation..." -ForegroundColor Yellow
+Write-Host "[1/6] Pruefe Python-Installation..." -ForegroundColor Yellow
 try {
     $pythonVersion = python --version 2>&1
     Write-Host "Gefunden: $pythonVersion" -ForegroundColor Green
@@ -15,7 +15,7 @@ try {
         $major = [int]$Matches[1]
         $minor = [int]$Matches[2]
         if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 11)) {
-            Write-Warning "Python 3.11 oder höher wird empfohlen! Deine Version ist eventuell veraltet."
+            Write-Warning "Python 3.11 oder hoeher wird empfohlen! Deine Version ist eventuell veraltet."
         }
     }
 } catch {
@@ -48,17 +48,17 @@ if (Test-Path (Join-Path $adbDir "adb.exe")) {
 
 # 3. Add ADB to User PATH Environment Variable
 Write-Host ""
-Write-Host "[3/6] Füge ADB zum Windows-Benutzerpfad (PATH) hinzu..." -ForegroundColor Yellow
+Write-Host "[3/6] Fuege ADB zum Windows-Benutzerpfad (PATH) hinzu..." -ForegroundColor Yellow
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($userPath -like "*$adbDir*") {
     Write-Host "ADB befindet sich bereits in deinem PATH." -ForegroundColor Green
 } else {
-    Write-Host "Füge $adbDir zum User PATH hinzu..." -ForegroundColor Gray
+    Write-Host "Fuege $adbDir zum User PATH hinzu..." -ForegroundColor Gray
     $newPath = "$userPath;$adbDir"
     [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
     # Update current session PATH too
     $env:PATH = "$env:PATH;$adbDir"
-    Write-Host "PATH erfolgreich aktualisiert! (Änderungen gelten für neue Eingabeaufforderungen)." -ForegroundColor Green
+    Write-Host "PATH erfolgreich aktualisiert! (Aenderungen gelten fuer neue Eingabeaufforderungen)." -ForegroundColor Green
 }
 
 # 4. Create virtual environment and install requirements
@@ -78,29 +78,29 @@ if (-not (Test-Path $venvPython)) {
 Write-Host "Upgrade pip..." -ForegroundColor Gray
 Start-Process -FilePath $venvPython -ArgumentList "-m pip install --upgrade pip" -Wait -NoNewWindow
 
-Write-Host "Installiere Bot-Abhängigkeiten..." -ForegroundColor Gray
+Write-Host "Installiere Bot-Abhaengigkeiten..." -ForegroundColor Gray
 Start-Process -FilePath $venvPython -ArgumentList "-m pip install -r src/requirements.txt" -Wait -NoNewWindow
 
-Write-Host "Installiere Web-App-Abhängigkeiten..." -ForegroundColor Gray
+Write-Host "Installiere Web-App-Abhaengigkeiten..." -ForegroundColor Gray
 Start-Process -FilePath $venvPython -ArgumentList "-m pip install -r app/requirements.txt" -Wait -NoNewWindow
 
-Write-Host "Abhängigkeiten erfolgreich installiert!" -ForegroundColor Green
+Write-Host "Abhaengigkeiten erfolgreich installiert!" -ForegroundColor Green
 
 # 5. Create configs.py if not exists
 Write-Host ""
 Write-Host "[5/6] Konfigurationsdateien einrichten..." -ForegroundColor Yellow
 if (-not (Test-Path "src/configs.py")) {
     Copy-Item "src/configs.template.py" "src/configs.py"
-    Write-Host "src/configs.py aus Template erstellt. Bitte passe deine Passwörter dort an!" -ForegroundColor Green
+    Write-Host "src/configs.py aus Template erstellt. Bitte passe deine Passwoerter dort an!" -ForegroundColor Green
 } else {
-    Write-Host "src/configs.py existiert bereits (übersprungen)." -ForegroundColor Gray
+    Write-Host "src/configs.py existiert bereits (uebersprungen)." -ForegroundColor Gray
 }
 
 # 6. BlueStacks check
 Write-Host ""
 Write-Host "[6/6] BlueStacks Setup..." -ForegroundColor Yellow
 Write-Host "BlueStacks 5 muss manuell installiert werden." -ForegroundColor Gray
-$choice = Read-Host "Möchtest du die offizielle BlueStacks Download-Seite im Browser öffnen? (y/n)"
+$choice = Read-Host "Moechtest du die offizielle BlueStacks Download-Seite im Browser oeffnen? (y/n)"
 if ($choice.ToLower() -eq 'y') {
     Start-Process "https://www.bluestacks.com/download.html"
 }
@@ -109,8 +109,8 @@ Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "   SETUP ERFOLGREICH ABGESCHLOSSEN!      " -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
-Write-Host "Bitte öffne ein neues Terminalfenster,"
-Write-Host "damit die PATH-Änderungen für ADB wirksam werden."
+Write-Host "Bitte oeffne ein neues Terminalfenster,"
+Write-Host "damit die PATH-Aenderungen fuer ADB wirksam werden."
 Write-Host "Starte den Bot danach mit:"
 Write-Host "  .venv\Scripts\python.exe src/main.py"
 Write-Host "=========================================" -ForegroundColor Green
