@@ -139,9 +139,19 @@ $batContent | Out-File -FilePath $localBat -Encoding ascii
 # Save copy in user's Documents directory
 $documentsFolder = [System.Environment]::GetFolderPath("MyDocuments")
 if (Test-Path $documentsFolder) {
+    # start_bot.bat
     $docsBat = Join-Path $documentsFolder "start_bot.bat"
     $batContent | Out-File -FilePath $docsBat -Encoding ascii
     Write-Host "start_bot.bat in deinem Dokumente-Ordner erstellt ($docsBat)" -ForegroundColor Green
+    
+    # install.ps1 wrapper
+    $docsInstall = Join-Path $documentsFolder "install.ps1"
+    $installContent = @"
+Set-Location -Path "$currentDir"
+.\install.ps1
+"@
+    $installContent | Out-File -FilePath $docsInstall -Encoding utf8
+    Write-Host "install.ps1 (Installer-Wrapper) in deinem Dokumente-Ordner erstellt ($docsInstall)" -ForegroundColor Green
 }
 
 Write-Host ""
