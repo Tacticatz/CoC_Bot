@@ -184,6 +184,14 @@
                         <input type="checkbox" id="ATTACK_BUILDER_BASE">
                         <span>Bauarbeiterdorf Angriffe ausfuehren</span>
                     </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="AUTO_CLAIM_SEASON_PASS">
+                        <span>Silber-Pass Belohnungen automatisch abholen</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="USE_MAGIC_BOOKS">
+                        <span>Magische Buecher automatisch fuer Upgrades nutzen</span>
+                    </label>
                     
                     <button type="submit" class="btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-save"></i> Einstellungen speichern</button>
                 </form>
@@ -245,7 +253,8 @@
             // Apply checkbox values
             const checkboxes = [
                 "AUTO_START_BLUESTACKS", "UPGRADE_HEROES", "UPGRADE_HOME_BASE", 
-                "UPGRADE_HOME_LAB", "ATTACK_HOME_BASE", "ATTACK_BUILDER_BASE"
+                "UPGRADE_HOME_LAB", "ATTACK_HOME_BASE", "ATTACK_BUILDER_BASE",
+                "AUTO_CLAIM_SEASON_PASS", "USE_MAGIC_BOOKS"
             ];
             checkboxes.forEach(key => {
                 if (settings[key] !== undefined) {
@@ -327,7 +336,9 @@
                 UPGRADE_HOME_BASE: document.getElementById("UPGRADE_HOME_BASE").checked,
                 UPGRADE_HOME_LAB: document.getElementById("UPGRADE_HOME_LAB").checked,
                 ATTACK_HOME_BASE: document.getElementById("ATTACK_HOME_BASE").checked,
-                ATTACK_BUILDER_BASE: document.getElementById("ATTACK_BUILDER_BASE").checked
+                ATTACK_BUILDER_BASE: document.getElementById("ATTACK_BUILDER_BASE").checked,
+                AUTO_CLAIM_SEASON_PASS: document.getElementById("AUTO_CLAIM_SEASON_PASS").checked,
+                USE_MAGIC_BOOKS: document.getElementById("USE_MAGIC_BOOKS").checked
             };
 
             try {

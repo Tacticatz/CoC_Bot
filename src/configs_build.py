@@ -128,6 +128,8 @@ ATTACK_SLOT_RANGE = (0, 100) # inclusive, first slot is index 0
 EXCLUDE_CLAN_TROOPS = True
 ATTACK_HOME_BASE = True # can be overridden on desktop or web app
 ATTACK_BUILDER_BASE = True # can be overridden on desktop or web app
+AUTO_CLAIM_SEASON_PASS = True
+USE_MAGIC_BOOKS = False
 
 ########################
 # == System Configs == #

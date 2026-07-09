@@ -43,11 +43,28 @@ class Upgrader:
             timeout=timeout
         )
 
+    def _check_and_use_book(self):
+        if not getattr(configs, "USE_MAGIC_BOOKS", False):
+            return
+        time.sleep(0.8)
+        # Scan screen center for Book/instant upgrade keywords
+        section = Frame_Handler.get_frame_section(0.3, 0.3, 0.7, 0.7, high_contrast=True)
+        text = " ".join(OCR_Handler.get_text(section)).lower()
+        if "book" in text or "buch" in text or "sofort" in text or "instant" in text:
+            # Click "Use Book" green button (typically center-right in prompt)
+            Input_Handler.click(0.60, 0.65)
+            time.sleep(0.8)
+            # Click confirm/ok if another dialog pops up
+            Input_Handler.click_exit(3, 0.1)
+
     def _click_home_confirm(self, timeout=5):
-        return click_with_timeout(
+        success = click_with_timeout(
             lambda: Frame_Handler.locate(self.assets["confirm"], grayscale=False, thresh=0.85, use_cached=True),
             timeout=timeout
         )
+        if success:
+            self._check_and_use_book()
+        return success
 
     def _click_builder_confirm(self, timeout=5):
         return click_with_timeout(
@@ -1001,7 +1018,29 @@ class Upgrader:
                 upgrade_name = self.builder_lab_specified_upgrade(priority_level)
                 if upgrade_name is not None: return upgrade_name
         return self.builder_lab_random_upgrade()
-    
+    @require_exit()
+    def claim_season_pass(self):
+        import time
+        if not getattr(configs, "AUTO_CLAIM_SEASON_PASS", True):
+            return
+        try:
+            # 1. Click challenges board button at bottom left
+            Input_Handler.click(0.06, 0.77)
+            time.sleep(1.2)
+            
+            # 2. Click "Rewards" (Belohnungen) tab at top center-left
+            Input_Handler.click(0.30, 0.08)
+            time.sleep(1.0)
+            
+            # 3. Click "Claim All" (Alles abholen) button at bottom right
+            Input_Handler.click(0.85, 0.82)
+            time.sleep(1.5)
+            
+            # Close window
+            Input_Handler.click_exit(5, 0.1)
+        except Exception as e:
+            if configs.DEBUG: print("claim_season_pass failed:", e)
+
     # ============================================================
     # 📡 Upgrade Monitoring
     # ============================================================
@@ -1046,6 +1085,9 @@ class Upgrader:
         except: pass
         if not Task_Handler.lab_assistant_excluded():
             self.assign_lab_assistant()
+        
+        # Claim season pass rewards if enabled
+        self.claim_season_pass()
         
         for upgrade in upgrades_started + lab_upgrades_started:
             send_notification(f"Started upgrading {upgrade}")
