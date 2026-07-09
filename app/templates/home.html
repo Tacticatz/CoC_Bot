@@ -1,78 +1,354 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-    <script>if ('scrollRestoration' in history) history.scrollRestoration = 'manual';</script>
-    <title>CoC Bot</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoC Bot - Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .card-container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            margin-top: 20px;
+        }
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            text-align: left;
+            margin-bottom: 12px;
+        }
+        .form-row label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        .form-row input, .form-row select {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 15px;
+        }
+        .form-row input:focus, .form-row select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .flex-row {
+            display: flex;
+            gap: 10px;
+        }
+        .flex-row .form-row {
+            flex: 1;
+        }
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 15px;
+        }
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+        .btn-danger {
+            background-color: var(--danger);
+        }
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+        .instance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--notif_background);
+            padding: 12px 20px;
+            border-radius: 14px;
+            margin-bottom: 10px;
+        }
+        .instance-link {
+            text-decoration: none;
+            color: var(--text);
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .instance-link:hover {
+            color: var(--gold);
+        }
+        .config-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        .config-checkbox-row input {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <header>
         <img src="{{ url_for('static', filename='coc_bot_logo.png') }}" alt="CoC Bot">
-        <h1 class="themed_text">CoC Bot</h1>
+        <h1 class="themed_text">CoC Bot Dashboard</h1>
     </header>
 
     <div class="container">
-
-        <div style="margin-bottom:25px;">
-            <strong class="themed_text" style="font-size:4em; padding:0;">Instances</strong>
-        </div>
-
-        <form class="stacked-buttons"></form>
-        
-        <script>
-            let ids = {{ ids|default([])|tojson }};
-
-            async function fetchInstances() {
-                try {
-                    const response = await fetch("/instances");
-                    const data = await response.json();
-                    ids = data.ids;
-                } catch (error) {
-                    console.error('Error fetching instances:', error);
-                }
-            }
-
-            function updateInstances() {
-                let i = 0;
-                while (i < ids.length) {
-                    if (!document.getElementById(`id_${ids[i]}`)) {
-                        const idButton = document.createElement("button");
-                        idButton.type = "submit";
-                        idButton.id = `id_${ids[i]}`;
-                        idButton.value = ids[i];
-                        idButton.innerHTML = `${ids[i]}`;
-                        document.querySelector(".stacked-buttons").appendChild(idButton);
-                    }
-
-                    i++;
-                }
-            }
-
-            function update() {
-                fetchInstances().then(() => {
-                    updateInstances();
-                });
-            }
-            update();
-            setInterval(update, 3000);
-
-            document.body.addEventListener("touchstart", () => {}, false);
-
-            document.querySelectorAll("form").forEach(form => {
-                form.addEventListener("submit", async (e) => {
-                    e.preventDefault();
+        <div class="card-container">
+            
+            <!-- Instance management card -->
+            <div class="notifications">
+                <h1 class="notifications_title"><i class="fas fa-cubes"></i> Bot Instanzen</h1>
+                <div style="padding: 20px;">
+                    <div id="instances-list">
+                        <!-- Loaded dynamically -->
+                    </div>
                     
-                    const submitter = e.submitter;
+                    <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 20px 0;">
+                    
+                    <!-- Dynamic cloning form -->
+                    <form id="clone-instance-form" style="text-align: left;">
+                        <h3 style="margin-bottom: 10px; font-size: 1.2em;">BlueStacks Instanz klonen</h3>
+                        <div class="flex-row">
+                            <div class="form-row">
+                                <label for="source_id">Quelle (Kopieren von)</label>
+                                <select id="source_id" required>
+                                    <!-- Options filled dynamically -->
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="new_id">Neuer Name (z. B. alt_account)</label>
+                                <input type="text" id="new_id" placeholder="Account_ID" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn" style="width: 100%;"><i class="fas fa-copy"></i> Klonen & Registrieren</button>
+                    </form>
+                </div>
+            </div>
 
-                    setTimeout(() => {
-                        window.location.href = `/${submitter.value}`;
-                    }, 200);
-                });
-            });
-        </script>
+            <!-- Global settings card -->
+            <div class="exclusions">
+                <h1 class="exclusions_title"><i class="fas fa-sliders-h"></i> Globale Einstellungen</h1>
+                <form id="global-settings-form" style="padding: 20px; text-align: left;">
+                    <div class="form-row">
+                        <label for="CHECK_INTERVAL">Pruef-Intervall (in Minuten)</label>
+                        <input type="number" id="CHECK_INTERVAL" min="1" max="60" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="GROQ_API_KEY">Groq API Key (fuer Cloud OCR)</label>
+                        <input type="text" id="GROQ_API_KEY" placeholder="gsk_...">
+                    </div>
+                    <div class="form-row">
+                        <label for="TELEGRAM_BOT_TOKEN">Telegram Bot Token (fuer Push-Meldungen)</label>
+                        <input type="text" id="TELEGRAM_BOT_TOKEN" placeholder="bot_token">
+                    </div>
+                    
+                    <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 15px 0;">
+                    
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="AUTO_START_BLUESTACKS">
+                        <span>BlueStacks automatisch oeffnen/schliessen</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="UPGRADE_HEROES">
+                        <span>Helden upgraden</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="UPGRADE_HOME_BASE">
+                        <span>Heimatdorf Gebaeude upgraden</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="UPGRADE_HOME_LAB">
+                        <span>Labor (Heimatdorf) upgraden</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="ATTACK_HOME_BASE">
+                        <span>Heimatdorf Angriffe ausfuehren</span>
+                    </label>
+                    <label class="config-checkbox-row">
+                        <input type="checkbox" id="ATTACK_BUILDER_BASE">
+                        <span>Bauarbeiterdorf Angriffe ausfuehren</span>
+                    </label>
+                    
+                    <button type="submit" class="btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-save"></i> Einstellungen speichern</button>
+                </form>
+            </div>
+            
+        </div>
     </div>
+
+    <script>
+        let adbAddresses = {};
+
+        async function fetchDashboardData() {
+            try {
+                // Fetch instances
+                const resInst = await fetch("/instances");
+                const dataInst = await resInst.json();
+                adbAddresses = dataInst.adb_addresses || {};
+                renderInstances(dataInst.ids);
+                
+                // Fetch settings
+                const resSett = await fetch("/api/settings");
+                const dataSett = await resSett.json();
+                applySettings(dataSett.settings || {});
+            } catch (err) {
+                console.error("Fehler beim Laden des Dashboards:", err);
+            }
+        }
+
+        function renderInstances(ids) {
+            const list = document.getElementById("instances-list");
+            const sourceSelect = document.getElementById("source_id");
+            list.innerHTML = "";
+            sourceSelect.innerHTML = "";
+
+            if (ids.length === 0) {
+                list.innerHTML = `<div class="themed_text" style="padding: 20px; opacity: 0.6;">Keine Instanzen registriert. Starte den Bot oder clone oben eine Instanz!</div>`;
+                return;
+            }
+
+            ids.forEach(id => {
+                // Add to instances list
+                const item = document.createElement("div");
+                item.className = "instance-item";
+                item.innerHTML = `
+                    <a href="/${id}" class="instance-link"><i class="fas fa-gamepad"></i> ${id} <span style="font-size: 11px; opacity: 0.6;">(${adbAddresses[id] || "5555"})</span></a>
+                    <button class="btn btn-danger" onclick="deleteInstance('${id}')" style="padding: 6px 12px; font-size: 13px;"><i class="fas fa-trash-alt"></i> Loeschen</button>
+                `;
+                list.appendChild(item);
+
+                // Add to clone source options
+                const opt = document.createElement("option");
+                opt.value = id;
+                opt.textContent = id;
+                sourceSelect.appendChild(opt);
+            });
+        }
+
+        function applySettings(settings) {
+            // Apply checkbox values
+            const checkboxes = [
+                "AUTO_START_BLUESTACKS", "UPGRADE_HEROES", "UPGRADE_HOME_BASE", 
+                "UPGRADE_HOME_LAB", "ATTACK_HOME_BASE", "ATTACK_BUILDER_BASE"
+            ];
+            checkboxes.forEach(key => {
+                if (settings[key] !== undefined) {
+                    document.getElementById(key).checked = settings[key] === true || settings[key] === "true";
+                }
+            });
+
+            // Apply numeric and text inputs
+            if (settings.CHECK_INTERVAL !== undefined) {
+                document.getElementById("CHECK_INTERVAL").value = settings.CHECK_INTERVAL;
+            }
+            if (settings.GROQ_API_KEY !== undefined) {
+                document.getElementById("GROQ_API_KEY").value = settings.GROQ_API_KEY;
+            }
+            if (settings.TELEGRAM_BOT_TOKEN !== undefined) {
+                document.getElementById("TELEGRAM_BOT_TOKEN").value = settings.TELEGRAM_BOT_TOKEN;
+            }
+        }
+
+        async function deleteInstance(id) {
+            if (!confirm(`Moechtest du die Instanz "${id}" wirklich loeschen?`)) return;
+            try {
+                const res = await fetch(`/${id}/delete`, { method: "POST" });
+                if (res.ok) {
+                    fetchDashboardData();
+                } else {
+                    alert("Loeschen fehlgeschlagen!");
+                }
+            } catch (err) {
+                console.error("Fehler beim Loeschen:", err);
+            }
+        }
+
+        // Handle clone form submit
+        document.getElementById("clone-instance-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const source_id = document.getElementById("source_id").value;
+            const new_id = document.getElementById("new_id").value.trim().replaceAll(" ", "_");
+
+            if (!new_id) return;
+            
+            const btn = e.target.querySelector("button");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Klonen... Bitte warten (kann bis zu 1 Min dauern)`;
+            btn.disabled = true;
+
+            try {
+                const res = await fetch("/api/instances/clone", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ source_id, new_id })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Instanz "${new_id}" erfolgreich geklont auf Port ${data.adb_address}!`);
+                    document.getElementById("new_id").value = "";
+                    fetchDashboardData();
+                } else {
+                    alert("Klonen fehlgeschlagen: " + (data.message || "Unbekannter Fehler"));
+                }
+            } catch (err) {
+                console.error("Klonfehler:", err);
+                alert("Verbindungsfehler zum Server.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        // Handle global settings form submit
+        document.getElementById("global-settings-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const settings = {
+                CHECK_INTERVAL: parseInt(document.getElementById("CHECK_INTERVAL").value),
+                GROQ_API_KEY: document.getElementById("GROQ_API_KEY").value.trim(),
+                TELEGRAM_BOT_TOKEN: document.getElementById("TELEGRAM_BOT_TOKEN").value.trim(),
+                AUTO_START_BLUESTACKS: document.getElementById("AUTO_START_BLUESTACKS").checked,
+                UPGRADE_HEROES: document.getElementById("UPGRADE_HEROES").checked,
+                UPGRADE_HOME_BASE: document.getElementById("UPGRADE_HOME_BASE").checked,
+                UPGRADE_HOME_LAB: document.getElementById("UPGRADE_HOME_LAB").checked,
+                ATTACK_HOME_BASE: document.getElementById("ATTACK_HOME_BASE").checked,
+                ATTACK_BUILDER_BASE: document.getElementById("ATTACK_BUILDER_BASE").checked
+            };
+
+            try {
+                const res = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(settings)
+                });
+                if (res.ok) {
+                    alert("Einstellungen erfolgreich gespeichert!");
+                    fetchDashboardData();
+                } else {
+                    alert("Fehler beim Speichern der Einstellungen.");
+                }
+            } catch (err) {
+                console.error("Fehler beim Speichern:", err);
+            }
+        });
+
+        // Initial load
+        fetchDashboardData();
+    </script>
 </body>
 </html>

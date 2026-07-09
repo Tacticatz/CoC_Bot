@@ -53,8 +53,48 @@ INSTANCE_ID, ADB_ADDRESS, BLUESTACKS_PID = [None] * 3
 TEMP_CACHE = {}
 
 def parse_args(debug=None, id=None, gui=None, gui_port=None):
-    import argparse
+    import argparse, requests as _requests
     
+    # 1. Fetch dynamic settings and instance IDs from web app if configured
+    web_url = getattr(configs, "WEB_APP_URL", "")
+    if web_url != "":
+        try:
+            # Fetch active instances
+            res = _requests.get(
+                f"{web_url}/instances",
+                headers={"X-Bot-Token": getattr(configs, "WEB_APP_PASSWORD", "cocbot123")},
+                timeout=3
+            )
+            if res.status_code == 200:
+                data = res.json()
+                active_ids = data.get("ids", [])
+                adbs = data.get("adb_addresses", {})
+                if active_ids:
+                    configs.INSTANCE_IDS = active_ids
+                    configs.ADB_ADDRESSES = [adbs.get(i_id, "127.0.0.1:5555") for i_id in active_ids]
+                    configs.DEFAULT_INSTANCE_ID = active_ids[0]
+            
+            # Fetch global configuration variables
+            res_settings = _requests.get(
+                f"{web_url}/api/settings",
+                headers={"X-Bot-Token": getattr(configs, "WEB_APP_PASSWORD", "cocbot123")},
+                timeout=3
+            )
+            if res_settings.status_code == 200:
+                settings = res_settings.json().get("settings", {})
+                for key, val in settings.items():
+                    if hasattr(configs, key):
+                        # Convert types as needed
+                        orig_type = type(getattr(configs, key))
+                        if orig_type == bool:
+                            setattr(configs, key, str(val).lower() == "true")
+                        elif orig_type == int:
+                            setattr(configs, key, int(val))
+                        else:
+                            setattr(configs, key, val)
+        except Exception as e:
+            if getattr(configs, "DEBUG", False): print("[Dynamic Config Loader] Failed to fetch settings:", e)
+            
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", default=configs.DEBUG, help="Enable debug mode")
     parser.add_argument("--id", type=str, default=None, help="Instance ID")

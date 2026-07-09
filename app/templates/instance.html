@@ -51,17 +51,31 @@
 
         <!-- Live View Section -->
         <div id="live-view-panel" class="notifications" style="margin-top:30px;">
-            <h1 class="notifications_title">Live Screen</h1>
+            <h1 class="notifications_title">Live Screen (Interaktiv)</h1>
             <div style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="live-view-checkbox" onchange="toggleLiveView(this.checked)" style="width: 25px; height: 25px; cursor: pointer;">
                     <span class="themed_text" style="font-size: 1.5em; font-weight: bold;">Live-Übertragung aktivieren</span>
                 </div>
-                <div style="width: 100%; text-align: center;">
-                    <img id="live-screen-img" src="" alt="Warte auf Screenshot..." style="display: none; max-width: 100%; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                
+                <div style="width: 100%; text-align: center; position: relative;">
+                    <img id="live-screen-img" src="" alt="Warte auf Screenshot..." onclick="sendRemoteClick(event)" style="display: none; max-width: 100%; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.5); cursor: crosshair;">
                     <div id="live-screen-placeholder" class="themed_text" style="padding: 30px; font-size: 1.8em; opacity: 0.6;">
                         <i class="fas fa-desktop" style="font-size: 1.5em; margin-bottom: 10px; display: block;"></i>
                         Deaktiviert (Checkbox aktivieren zum Laden)
+                    </div>
+                </div>
+
+                <!-- Remote input controls (hidden when live screen is disabled) -->
+                <div id="remote-controls" style="display: none; width: 100%; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="remote-text-input" placeholder="Text an Gerät senden..." style="flex: 1; padding: 12px; font-size: 1.4em; border-radius: 12px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text);">
+                        <button type="button" onclick="sendRemoteType()" style="padding: 12px 20px; font-size: 1.4em; border-radius: 12px; border: none; background-color: var(--accent); color: white; cursor: pointer; font-weight: bold;">Senden</button>
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: center; width: 100%;">
+                        <button type="button" onclick="sendRemoteKey(67)" style="flex: 1; padding: 10px; font-size: 1.2em; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: var(--text); cursor: pointer;"><i class="fas fa-backspace"></i> Backspace</button>
+                        <button type="button" onclick="sendRemoteKey(66)" style="flex: 1; padding: 10px; font-size: 1.2em; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: var(--text); cursor: pointer;"><i class="fas fa-keyboard"></i> Enter</button>
+                        <button type="button" onclick="sendRemoteKey(3)" style="flex: 1; padding: 10px; font-size: 1.2em; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: var(--text); cursor: pointer;"><i class="fas fa-home"></i> Home</button>
                     </div>
                 </div>
             </div>
@@ -432,15 +446,18 @@
             function toggleLiveView(enabled) {
                 const img = document.getElementById("live-screen-img");
                 const placeholder = document.getElementById("live-screen-placeholder");
+                const controls = document.getElementById("remote-controls");
                 if (enabled) {
                     img.style.display = "inline-block";
                     placeholder.style.display = "none";
+                    controls.style.display = "flex";
                     updateLiveView();
                     if (liveViewInterval) clearInterval(liveViewInterval);
-                    liveViewInterval = setInterval(updateLiveView, 3500);
+                    liveViewInterval = setInterval(updateLiveView, 3000);
                 } else {
                     img.style.display = "none";
                     placeholder.style.display = "block";
+                    controls.style.display = "none";
                     if (liveViewInterval) {
                         clearInterval(liveViewInterval);
                         liveViewInterval = null;
@@ -451,6 +468,59 @@
                 const img = document.getElementById("live-screen-img");
                 if (img.style.display !== "none") {
                     img.src = `/${id}/screenshot?t=` + Date.now();
+                }
+            }
+
+            // Interactive Remote Control Handlers
+            async function sendRemoteClick(event) {
+                const img = event.target;
+                const rect = img.getBoundingClientRect();
+                
+                // Calculate relative click coordinate between 0.0 and 1.0
+                const x = (event.clientX - rect.left) / rect.width;
+                const y = (event.clientY - rect.top) / rect.height;
+
+                try {
+                    await fetch(`/${id}/click`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ x, y })
+                    });
+                    // Refresh screen immediately to see result
+                    setTimeout(updateLiveView, 500);
+                } catch (err) {
+                    console.error("Fehler beim Senden des Klicks:", err);
+                }
+            }
+
+            async function sendRemoteType() {
+                const input = document.getElementById("remote-text-input");
+                const text = input.value;
+                if (!text) return;
+
+                try {
+                    await fetch(`/${id}/type`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text })
+                    });
+                    input.value = "";
+                    setTimeout(updateLiveView, 800);
+                } catch (err) {
+                    console.error("Fehler beim Senden des Texts:", err);
+                }
+            }
+
+            async function sendRemoteKey(key) {
+                try {
+                    await fetch(`/${id}/keyevent`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key })
+                    });
+                    setTimeout(updateLiveView, 500);
+                } catch (err) {
+                    console.error("Fehler beim Senden des Keyevents:", err);
                 }
             }
         </script>

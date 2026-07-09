@@ -33,13 +33,17 @@ class Instance:
         run_status="",
         end_time=0,
         exclusions=set(),
-        notifications=deque(maxlen=NOTIFICATION_CACHE_SIZE)
+        notifications=deque(maxlen=NOTIFICATION_CACHE_SIZE),
+        adb_address="127.0.0.1:5555",
+        bluestacks_name=""
     ):
         self.id = id
         self.run_status = run_status
         self.end_time = end_time
         self.exclusions = exclusions
         self.notifications = notifications
+        self.adb_address = adb_address
+        self.bluestacks_name = bluestacks_name
     
     def __eq__(self, other):
         return self.id == other.id
@@ -53,7 +57,9 @@ class Instance:
             "run_status": self.run_status,
             "end_time": self.end_time,
             "exclusions": sorted(list(self.exclusions)),
-            "notifications": list(self.notifications)
+            "notifications": list(self.notifications),
+            "adb_address": self.adb_address,
+            "bluestacks_name": self.bluestacks_name
         }
     
     def get_notifications(self, limit=NOTIFICATION_CACHE_SIZE):
@@ -62,7 +68,7 @@ class Instance:
     def add_notification(self, data):
         self.notifications.append({"time_stamp": time.time(), "data": str(data)})
         data = get_cache()
-        data["known_instances"][self.id] = self.to_dict()
+        data.setdefault("known_instances", {})[self.id] = self.to_dict()
         with open(CACHE_PATH, "w") as f:
             json.dump(data, f, indent=4)
 
@@ -80,13 +86,14 @@ def get_cache():
 def get_known_instances():
     global instances
     data = get_cache()
-    if os.path.exists(CACHE_PATH):
-        try:
-            with open(CACHE_PATH, "r") as f:
-                data = json.load(f)
-        except:
-            data = {}
     known_instances = data.get("known_instances", {})
+    
+    # If cache is empty, seed a default 'main' instance
+    if not known_instances:
+        instances["main"] = Instance("main", adb_address="127.0.0.1:5555", bluestacks_name="Pie64")
+        update_known_instances()
+        return
+
     for id in known_instances:
         id = str(id)
         info = known_instances[id]
@@ -95,14 +102,17 @@ def get_known_instances():
             run_status=info.get("run_status", ""),
             end_time=info.get("end_time", 0),
             exclusions=set(info.get("exclusions", [])),
-            notifications=deque(info.get("notifications", []), maxlen=NOTIFICATION_CACHE_SIZE)
+            notifications=deque(info.get("notifications", []), maxlen=NOTIFICATION_CACHE_SIZE),
+            adb_address=info.get("adb_address", "127.0.0.1:5555"),
+            bluestacks_name=info.get("bluestacks_name", "")
         )
 
 def update_known_instances():
     global instances
-    data = {id: instances[id].to_dict() for id in instances}
+    data = get_cache()
+    data["known_instances"] = {id: instances[id].to_dict() for id in instances}
     with open(CACHE_PATH, "w") as f:
-        json.dump({"known_instances": data}, f, indent=4)
+        json.dump(data, f, indent=4)
 
 
 # Global screenshot storage
@@ -257,14 +267,157 @@ def handle_instances():
     if request.method == "POST":
         data = request.json
         id = str(data.get("id", "")).strip()
+        adb = str(data.get("adb_address", "127.0.0.1:5555")).strip()
+        bs_name = str(data.get("bluestacks_name", "")).strip()
         if id == "":
             return jsonify({"status": "error", "message": "Invalid ID"}), 400
         if id not in instances:
-            instances[id] = Instance(id)
+            instances[id] = Instance(id, adb_address=adb, bluestacks_name=bs_name)
+            update_known_instances()
+        else:
+            # Update existing parameters
+            instances[id].adb_address = adb
+            instances[id].bluestacks_name = bs_name
             update_known_instances()
         return jsonify({"status": "success", "id": id})
 
-    return jsonify({"ids": sorted(instances.keys())})
+    adb_addresses = {id: instances[id].adb_address for id in instances}
+    return jsonify({
+        "ids": sorted(instances.keys()),
+        "adb_addresses": adb_addresses
+    })
+
+@app.route("/<id>/delete", methods=["POST"])
+def delete_instance(id):
+    global instances
+    if id in instances:
+        del instances[id]
+        update_known_instances()
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Instance not found"}), 404
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def handle_settings():
+    data = get_cache()
+    settings = data.setdefault("settings", {})
+    if request.method == "POST":
+        new_settings = request.json
+        for key, val in new_settings.items():
+            settings[key] = val
+        update_known_instances()
+        return jsonify({"status": "success", "settings": settings})
+    return jsonify({"settings": settings})
+
+@app.route("/api/instances/clone", methods=["POST"])
+def clone_instance():
+    data = request.json
+    source_id = data.get("source_id", "main")
+    new_id = str(data.get("new_id", "")).strip()
+    
+    if not new_id:
+        return jsonify({"status": "error", "message": "Invalid new ID"}), 400
+        
+    import json
+    from pathlib import Path
+    import subprocess
+    import re
+    
+    mim_path = r"C:\ProgramData\BlueStacks_nxt\Engine\UserData\MimMetaData.json"
+    if not Path(mim_path).exists():
+        return jsonify({"status": "error", "message": "MimMetaData.json not found"}), 500
+        
+    try:
+        mim_data = json.loads(Path(mim_path).read_text(encoding="utf-8"))
+        instances_map = {inst['Name']: inst["InstanceName"] for inst in mim_data["Organization"]}
+        internal_source = instances_map.get(source_id)
+        if not internal_source:
+            internal_source = "Pie64"
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed reading MimMetaData: {str(e)}"}), 500
+        
+    manager_path = r"C:\Program Files\BlueStacks_nxt\HD-MultiInstanceManager.exe"
+    if not Path(manager_path).exists():
+        return jsonify({"status": "error", "message": "BlueStacks Multi-Instance Manager not found"}), 500
+        
+    try:
+        proc = subprocess.run(
+            [manager_path, "clone", "--source", internal_source, "--name", new_id],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if proc.returncode != 0:
+            return jsonify({"status": "error", "message": f"Clone command failed: {proc.stderr}"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed executing clone: {str(e)}"}), 500
+        
+    # Wait briefly for metadata to update
+    time.sleep(2)
+    
+    try:
+        mim_data = json.loads(Path(mim_path).read_text(encoding="utf-8"))
+        instances_map = {inst['Name']: inst["InstanceName"] for inst in mim_data["Organization"]}
+        internal_new = instances_map.get(new_id)
+        if not internal_new:
+            return jsonify({"status": "error", "message": "Cloned instance not found in metadata"}), 500
+            
+        conf_path = Path(r"C:\ProgramData\BlueStacks_nxt\bluestacks.conf")
+        adb_port = 5555
+        if conf_path.exists():
+            content = conf_path.read_text(encoding="utf-8", errors="ignore")
+            for _ in range(5):
+                match = re.search(rf'bst\.instance\.{internal_new}\.status\.adb_port="(\d+)"', content)
+                if match:
+                    adb_port = int(match.group(1))
+                    break
+                time.sleep(1)
+                content = conf_path.read_text(encoding="utf-8", errors="ignore")
+                
+        adb_address = f"127.0.0.1:{adb_port}"
+        instances[new_id] = Instance(new_id, adb_address=adb_address, bluestacks_name=internal_new)
+        update_known_instances()
+        
+        return jsonify({"status": "success", "id": new_id, "adb_address": adb_address})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed registering cloned instance: {str(e)}"}), 500
+
+@app.route("/<id>/click", methods=["POST"])
+def remote_click(id):
+    instance = instances.get(id)
+    if not instance: abort(404)
+    data = request.json
+    x_rel = float(data.get("x"))
+    y_rel = float(data.get("y"))
+    x_px = int(x_rel * 1920)
+    y_px = int(y_rel * 1080)
+    
+    import subprocess
+    adb_addr = instance.adb_address
+    subprocess.run(["adb", "-s", adb_addr, "shell", "input", "tap", str(x_px), str(y_px)])
+    return jsonify({"status": "success"})
+
+@app.route("/<id>/type", methods=["POST"])
+def remote_type(id):
+    instance = instances.get(id)
+    if not instance: abort(404)
+    text = request.json.get("text", "")
+    safe_text = text.replace(" ", "%s").replace("'", "\\'")
+    
+    import subprocess
+    adb_addr = instance.adb_address
+    subprocess.run(["adb", "-s", adb_addr, "shell", "input", "text", safe_text])
+    return jsonify({"status": "success"})
+
+@app.route("/<id>/keyevent", methods=["POST"])
+def remote_keyevent(id):
+    instance = instances.get(id)
+    if not instance: abort(404)
+    key = int(request.json.get("key", 67))
+    
+    import subprocess
+    adb_addr = instance.adb_address
+    subprocess.run(["adb", "-s", adb_addr, "shell", "input", "keyevent", str(key)])
+    return jsonify({"status": "success"})
 
 @app.after_request
 def add_cache_headers(response):
