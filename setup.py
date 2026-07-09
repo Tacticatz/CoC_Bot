@@ -35,3 +35,13 @@ if not Path.exists(dir_path / "scripts" / "start.sh"):
     shutil.copy(dir_path / "scripts" / "start.template.sh", dir_path / "scripts" / "start.sh")
 else:
     print(f"scripts/start.sh already exists, skipping creation.")
+
+if sys.platform == "win32":
+    batch_content = f'''@echo off
+cd /d "{dir_path}"
+.venv\\Scripts\\python.exe src\\main.py %*
+pause
+'''
+    with open(dir_path / "start_bot.bat", "w") as f:
+        f.write(batch_content)
+    print("[OK] Created start_bot.bat - double-click to run the bot!")

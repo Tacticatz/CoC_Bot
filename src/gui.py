@@ -21,7 +21,9 @@ def run_gui(server_port, pipe, debug=False):
         width=400,
         height=600,
         min_size=(400, 600),
-        resizable=(sys.platform == "darwin"),
+        resizable=True,
+        background_color='#FFFFFF',
+        text_select=False,
     )
     
     def on_closed():

@@ -1,3 +1,23 @@
+import sys
+import os
+
+def ensure_admin_privileges():
+    """Ensure script has admin rights on Windows (needed for sleep management)."""
+    import ctypes
+    
+    if sys.platform != "win32":
+        return
+    
+    try:
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            return
+    except Exception:
+        return
+    
+    print("[INFO] Admin privileges required for sleep management. Requesting elevation...")
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+    sys.exit()
+
 def launch_proc(args):
     from log import enable_logging
     from utils import parse_args, init_instance
@@ -19,6 +39,7 @@ def gui_launch(args):
     import utils
     from gui import init_gui, get_gui
     from copy import deepcopy
+    import signal
     
     procs = {}
     pipe = init_gui(args.id)
@@ -44,15 +65,40 @@ def gui_launch(args):
             elif action == "stop":
                 p = procs.pop(id, None)
                 if p and p.is_alive():
-                    p.terminate()
-                    p.join()
+                    if sys.platform == "win32":
+                        p.terminate()
+                        try:
+                            p.join(timeout=2)
+                            if p.is_alive():
+                                p.kill()
+                                p.join()
+                        except:
+                            pass
+                    else:
+                        try:
+                            os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+                        except:
+                            pass
+                        p.join()
     except (EOFError, KeyboardInterrupt, SystemExit):
         get_gui().stop()
         pipe.close()
         for p in procs.values():
             if p and p.is_alive():
-                p.terminate()
-                p.join()
+                if sys.platform == "win32":
+                    p.terminate()
+                    try:
+                        p.join(timeout=1)
+                        if p.is_alive():
+                            p.kill()
+                    except:
+                        pass
+                else:
+                    try:
+                        os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+                    except:
+                        pass
+                    p.join()
 
 def launch():
     import utils
