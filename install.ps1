@@ -6,6 +6,24 @@ Write-Host "     CoC Bot - Windows Installer         " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# 0. Windows Server check (Install Wireless LAN Service for wlanapi.dll)
+try {
+    $os = Get-CimInstance Win32_OperatingSystem
+    if ($os.ProductType -ne 1) {
+        Write-Host "Windows Server erkannt. Pruefe Wireless LAN Service (wlanapi.dll)..." -ForegroundColor Yellow
+        $feature = Get-WindowsFeature -Name Wireless-Networking -ErrorAction SilentlyContinue
+        if ($feature -and -not $feature.Installed) {
+            Write-Host "Installiere Wireless-Networking Feature (benoetigt Administratorrechte)..." -ForegroundColor Yellow
+            Install-WindowsFeature -Name Wireless-Networking -ErrorAction Stop
+            Write-Host "Feature erfolgreich installiert! Bitte starte Windows neu, damit ADB funktioniert." -ForegroundColor Green
+        } else {
+            Write-Host "Wireless-Networking Feature ist bereits installiert." -ForegroundColor Green
+        }
+    }
+} catch {
+    Write-Warning "Konnte Windows Server Features nicht pruefen. Stelle sicher, dass du als Administrator angemeldet bist, falls wlanapi.dll Fehler auftreten."
+}
+
 # 1. Check Python installation
 Write-Host "[1/6] Pruefe Python-Installation..." -ForegroundColor Yellow
 try {
