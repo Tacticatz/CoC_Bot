@@ -49,6 +49,24 @@
             <button type="submit" name="time" value="0">Cancel</button>
         </form>
 
+        <!-- Live View Section -->
+        <div id="live-view-panel" class="notifications" style="margin-top:30px;">
+            <h1 class="notifications_title">Live Screen</h1>
+            <div style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="live-view-checkbox" onchange="toggleLiveView(this.checked)" style="width: 25px; height: 25px; cursor: pointer;">
+                    <span class="themed_text" style="font-size: 1.5em; font-weight: bold;">Live-Übertragung aktivieren</span>
+                </div>
+                <div style="width: 100%; text-align: center;">
+                    <img id="live-screen-img" src="" alt="Warte auf Screenshot..." style="display: none; max-width: 100%; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                    <div id="live-screen-placeholder" class="themed_text" style="padding: 30px; font-size: 1.8em; opacity: 0.6;">
+                        <i class="fas fa-desktop" style="font-size: 1.5em; margin-bottom: 10px; display: block;"></i>
+                        Deaktiviert (Checkbox aktivieren zum Laden)
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="notifications" class="notifications" style="margin-top:30px;">
             <h1 class="notifications_title">Recent Notifications</h1>
         </div>
@@ -408,6 +426,33 @@
                     form.reset();
                 });
             });
+
+            // Live screen view updates
+            let liveViewInterval = null;
+            function toggleLiveView(enabled) {
+                const img = document.getElementById("live-screen-img");
+                const placeholder = document.getElementById("live-screen-placeholder");
+                if (enabled) {
+                    img.style.display = "inline-block";
+                    placeholder.style.display = "none";
+                    updateLiveView();
+                    if (liveViewInterval) clearInterval(liveViewInterval);
+                    liveViewInterval = setInterval(updateLiveView, 3500);
+                } else {
+                    img.style.display = "none";
+                    placeholder.style.display = "block";
+                    if (liveViewInterval) {
+                        clearInterval(liveViewInterval);
+                        liveViewInterval = null;
+                    }
+                }
+            }
+            function updateLiveView() {
+                const img = document.getElementById("live-screen-img");
+                if (img.style.display !== "none") {
+                    img.src = `/${id}/screenshot?t=` + Date.now();
+                }
+            }
         </script>
         {% endif %}
     </div>

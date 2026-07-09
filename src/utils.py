@@ -1,12 +1,41 @@
 import sys, collections
 from pathlib import Path
 from functools import lru_cache
+
+# Human-like sleep monkey patch for anti-detection
+import time as _time
+import random as _random
+def _stealth_sleep(seconds):
+    if seconds > 0.05:
+        # Add up to 12% random variance to simulate human inconsistency
+        jitter = _random.uniform(-seconds * 0.12, seconds * 0.12)
+        seconds = max(0.005, seconds + jitter)
+    _time.sleep(seconds)
+_time.sleep = _stealth_sleep
+
 try:
     import configs
     from configs import *
 except:
     import configs_build as configs
     from configs_build import *
+
+# Transparent API authentication header injection
+import requests as _requests
+class _StealthRequests:
+    def __getattr__(self, name):
+        attr = getattr(_requests, name)
+        if name in ("get", "post", "put", "delete"):
+            def wrapper(*args, **kwargs):
+                url = args[0] if args else kwargs.get("url", "")
+                web_url = getattr(configs, "WEB_APP_URL", "")
+                if web_url and web_url in url:
+                    headers = kwargs.setdefault("headers", {})
+                    headers["X-Bot-Token"] = getattr(configs, "WEB_APP_PASSWORD", "cocbot123")
+                return attr(*args, **kwargs)
+            return wrapper
+        return attr
+sys.modules["requests"] = _StealthRequests()
 
 if sys.platform == "win32":
     ES_CONTINUOUS = 0x80000000
@@ -1199,9 +1228,15 @@ class ADB_Manager:
 class Input_Handler:
     @classmethod
     def down(cls, x, y, pointer=0):
+        import random
         from pyminitouch import CommandBuilder
         if x < 0: x = 1 + x
         if y < 0: y = 1 + y
+        
+        # Add slight jitter to inputs
+        x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
+        y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
+
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
         x = int(x * MAX_X)
@@ -1219,10 +1254,15 @@ class Input_Handler:
 
     @classmethod
     def click(cls, x, y, n=1, delay=0, pointer=0):
-        import time
+        import time, random
         from pyminitouch import CommandBuilder
         if x < 0: x = 1 + x
         if y < 0: y = 1 + y
+        
+        # Generate coordinates with slight gaussian jitter (human-like)
+        x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
+        y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
+
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
         x = int(x * MAX_X)
@@ -1247,7 +1287,7 @@ class Input_Handler:
 
     @classmethod
     def swipe(cls, x1, y1, x2, y2, duration=100, hold_end_time=0, inter_points=0, pointer=0):
-        import time, numpy as np
+        import time, numpy as np, random
         from pyminitouch import CommandBuilder
         
         if x1 < 0: x1 = 1 + x1
@@ -1255,27 +1295,62 @@ class Input_Handler:
         if x2 < 0: x2 = 1 + x2
         if y2 < 0: y2 = 1 + y2
         
-        builder = CommandBuilder()
-        
+        # Jitter endpoints
+        x1 = max(0.0, min(1.0, x1 + random.gauss(0, 0.0015)))
+        y1 = max(0.0, min(1.0, y1 + random.gauss(0, 0.0025)))
+        x2 = max(0.0, min(1.0, x2 + random.gauss(0, 0.0015)))
+        y2 = max(0.0, min(1.0, y2 + random.gauss(0, 0.0025)))
+
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
         
-        x1 = int(x1 * MAX_X)
-        y1 = int(y1 * MAX_Y)
-        x2 = int(x2 * MAX_X)
-        y2 = int(y2 * MAX_Y)
+        x1_px = int(x1 * MAX_X)
+        y1_px = int(y1 * MAX_Y)
+        x2_px = int(x2 * MAX_X)
+        y2_px = int(y2 * MAX_Y)
         
-        x_points = np.linspace(x1, x2, inter_points + 2, dtype=int)
-        y_points = np.linspace(y1, y2, inter_points + 2, dtype=int)
-        dt = duration / (inter_points + 1)
+        if inter_points <= 0:
+            dist = np.hypot(x2_px - x1_px, y2_px - y1_px)
+            inter_points = max(5, int(dist / 20))
+            
+        # Draw a human-like Bezier curve rather than a perfectly straight line
+        mid_x = (x1_px + x2_px) / 2
+        mid_y = (y1_px + y2_px) / 2
+        dx = x2_px - x1_px
+        dy = y2_px - y1_px
+        length = np.hypot(dx, dy)
+        if length > 0:
+            perp_x = -dy / length
+            perp_y = dx / length
+            offset_magnitude = random.uniform(-0.04, 0.04) * length
+            ctrl_x = mid_x + perp_x * offset_magnitude
+            ctrl_y = mid_y + perp_y * offset_magnitude
+        else:
+            ctrl_x, ctrl_y = mid_x, mid_y
+
+        t = np.linspace(0, 1, inter_points + 2)
+        x_points = ((1 - t) ** 2 * x1_px + 2 * (1 - t) * t * ctrl_x + t ** 2 * x2_px).astype(int)
+        y_points = ((1 - t) ** 2 * y1_px + 2 * (1 - t) * t * ctrl_y + t ** 2 * y2_px).astype(int)
         
-        builder.down(pointer, x1, y1, pressure=100)
+        builder = CommandBuilder()
+        builder.down(pointer, x1_px, y1_px, pressure=100)
         builder.publish(ADB_Manager.minitouch_device.connection)
-        for x, y in zip(x_points, y_points):
-            builder.move(pointer, x, y, pressure=100)
+        
+        # Calculate human-like step delay (acceleration and deceleration)
+        total_steps = inter_points + 1
+        time_steps = np.diff(np.sin(np.linspace(0, np.pi/2, total_steps + 1)))
+        time_steps = time_steps / np.sum(time_steps) * duration
+        
+        for i, (x, y) in enumerate(zip(x_points[1:], y_points[1:])):
+            builder.move(pointer, int(x), int(y), pressure=100)
             builder.publish(ADB_Manager.minitouch_device.connection)
-            if dt > 0: time.sleep(dt / 1000)
-        if hold_end_time > 0: time.sleep(hold_end_time / 1000)
+            dt = time_steps[i]
+            dt = max(1, dt + random.uniform(-dt * 0.1, dt * 0.1))
+            time.sleep(dt / 1000)
+            
+        if hold_end_time > 0:
+            time.sleep(max(0.001, (hold_end_time + random.uniform(-hold_end_time * 0.1, hold_end_time * 0.1)) / 1000))
+            
         builder.up(pointer)
         builder.publish(ADB_Manager.minitouch_device.connection)
 
@@ -1326,7 +1401,34 @@ class Input_Handler:
 class Frame_Handler:
     pool = None
     cached_frame = None
+    _last_upload_time = 0
     
+    @classmethod
+    def trigger_background_upload(cls, frame):
+        import time, threading
+        if time.time() - cls._last_upload_time < 3.5:
+            return
+        cls._last_upload_time = time.time()
+        threading.Thread(target=cls._upload_frame_proc, args=(frame.copy(),), daemon=True).start()
+
+    @classmethod
+    def _upload_frame_proc(cls, frame):
+        import cv2, requests
+        try:
+            web_url = getattr(configs, "WEB_APP_URL", "")
+            if not web_url:
+                return
+            # Encode to low-quality JPEG to minimize network footprint
+            _, img_encoded = cv2.imencode('.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+            img_bytes = img_encoded.tobytes()
+            requests.post(
+                f"{web_url}/{INSTANCE_ID}/screenshot_upload",
+                files={"file": ("screenshot.jpg", img_bytes, "image/jpeg")},
+                timeout=5
+            )
+        except:
+            pass
+
     @classmethod
     def grayscale(cls, frame):
         import cv2
@@ -1361,6 +1463,7 @@ class Frame_Handler:
             frame = np.array(frame)[..., :3]
             frame = cv2.resize(frame, WINDOW_DIMS, interpolation=cv2.INTER_NEAREST)
             cls.cached_frame = frame.copy()
+            cls.trigger_background_upload(frame)
         if configs.DEBUG: cls.save_frame(frame, "debug/frame.png")
         if high_contrast: frame = cls.high_contrast(frame, thresh)
         elif grayscale: frame = cls.grayscale(frame)

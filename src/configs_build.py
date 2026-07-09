@@ -138,3 +138,19 @@ AUTO_START_BLUESTACKS = True
 WINDOW_DIMS = (1920, 1080) # width, height
 ADB_ABS_DIR = "" # absolute path to dir with adb executable, leave empty to use system PATH
 BLUESTACKS_BIN_PATH = "" # absolute path to Bluestacks executable, leave empty to use system defaults
+
+# Load sensitive configurations from environment variables if present
+import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+WEB_APP_URL = os.environ.get("WEB_APP_URL", WEB_APP_URL)
+PA_USERNAME = os.environ.get("PA_USERNAME", PA_USERNAME)
+PA_PASSWORD = os.environ.get("PA_PASSWORD", PA_PASSWORD)
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", GROQ_API_KEY)
+WEB_APP_PASSWORD = os.environ.get("WEB_APP_PASSWORD", "cocbot123")
+

@@ -6,12 +6,24 @@ from collections import deque
 from flask import Flask, render_template, jsonify, abort, request
 from flask_cors import CORS
 
+import sys
+from flask import redirect, session, url_for
+
 PATH = Path(__file__).parent
 CACHE_PATH = PATH / "data" / "cache.json"
 CACHE_PATH.parent.mkdir(exist_ok=True)
 NOTIFICATION_CACHE_SIZE = 3
 
+# Load configuration from src folder
+sys.path.append(str(PATH.parent / "src"))
+try:
+    import configs
+except ImportError:
+    class configs:
+        WEB_APP_PASSWORD = "cocbot-default-password"
+
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "cocbot-secret-key-12345")
 CORS(app)
 
 class Instance:
@@ -91,6 +103,70 @@ def update_known_instances():
     data = {id: instances[id].to_dict() for id in instances}
     with open(CACHE_PATH, "w") as f:
         json.dump({"known_instances": data}, f, indent=4)
+
+
+# Global screenshot storage
+screenshots = {}
+
+@app.before_request
+def check_auth():
+    # Exclude static files and login/logout endpoints
+    if request.path.startswith("/static/") or request.endpoint in ("login", "logout"):
+        return
+
+    # Check for secret token in API calls
+    token = request.headers.get("X-Bot-Token") or request.args.get("token")
+    expected_pw = getattr(configs, "WEB_APP_PASSWORD", "cocbot123")
+    if token and token == expected_pw:
+        return
+
+    # Otherwise check browser session
+    if session.get("logged_in"):
+        return
+
+    # For API/AJAX endpoints, return 401 Unauthorized
+    api_paths = ["/running", "/status", "/exclude", "/notify", "/notifications", "/instances", "/screenshot_upload", "/screenshot"]
+    if any(request.path.endswith(path) for path in api_paths):
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    # Redirect UI visitors to login
+    return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password")
+        expected_pw = getattr(configs, "WEB_APP_PASSWORD", "cocbot123")
+        if password == expected_pw:
+            session["logged_in"] = True
+            return redirect(url_for("home"))
+        error = "Ungültiges Passwort!"
+    return render_template("login.html", error=error)
+
+@app.route("/logout")
+def logout():
+    session.pop("logged_in", None)
+    return redirect(url_for("login"))
+
+@app.route("/<id>/screenshot_upload", methods=["POST"])
+def upload_screenshot(id):
+    global screenshots
+    file = request.files.get("file")
+    if file:
+        screenshots[id] = file.read()
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "No file uploaded"}), 400
+
+@app.route("/<id>/screenshot", methods=["GET"])
+def get_screenshot(id):
+    img_data = screenshots.get(id)
+    if not img_data:
+        abort(404)
+    from flask import make_response
+    response = make_response(img_data)
+    response.headers.set("Content-Type", "image/jpeg")
+    return response
 
 @app.route("/", methods=["GET"])
 def home():
