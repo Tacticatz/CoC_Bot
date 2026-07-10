@@ -817,20 +817,45 @@ class BlueStacks_Manager:
             )
         elif sys.platform == "win32":
             bin_path = BLUESTACKS_BIN_PATH if BLUESTACKS_BIN_PATH != "" else r"C:\Program Files\BlueStacks_nxt\HD-Player.exe"
+            is_ldplayer = "dnplayer" in bin_path.lower() or "ldplayer" in bin_path.lower()
+            
             if not Path(bin_path).exists():
-                bin_path = file_search("/", "HD-Player.exe", ["bluestacks"])
-            assert Path(bin_path).exists(), f"BlueStacks executable not found at {bin_path}"
+                if is_ldplayer:
+                    # Fallback to standard LDPlayer directories
+                    for p in [r"C:\LDPlayer\LDPlayer9\dnplayer.exe", r"C:\ChangZhi\LDPlayer9\dnplayer.exe"]:
+                        if Path(p).exists():
+                            bin_path = p
+                            break
+                else:
+                    bin_path = file_search("/", "HD-Player.exe", ["bluestacks"])
+            
+            assert Path(bin_path).exists(), f"Emulator executable not found at {bin_path}"
+            
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 7
-            subprocess.Popen(
-                [bin_path, "--instance", str_target_instance_name],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                startupinfo=startupinfo,
-                creationflags=subprocess.DETACHED_PROCESS,
-            )
+            
+            if is_ldplayer:
+                # LDPlayer starts first instance with index=0, or subsequent instances by name
+                inst_arg = "index=0" if (instance_id == "main" or instance_id == "LDPlayer") else f"name={instance_id}"
+                subprocess.Popen(
+                    [bin_path, inst_arg],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.DETACHED_PROCESS,
+                )
+            else:
+                # BlueStacks launch command
+                subprocess.Popen(
+                    [bin_path, "--instance", str_target_instance_name],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.DETACHED_PROCESS,
+                )
         else:
             raise Exception("Unsupported OS")
         

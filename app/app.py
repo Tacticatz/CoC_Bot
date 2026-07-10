@@ -493,12 +493,12 @@ def get_bot_status(id):
     proc, _ = bot_processes.get(id, (None, None))
     bot_running = proc is not None and proc.poll() is None
     
-    # 2. Check if BlueStacks Player is running
+    # 2. Check if Emulator Player (BlueStacks/LDPlayer) is running
     import subprocess
     emulator_running = False
     try:
-        proc_check = subprocess.run(["tasklist", "/FI", "IMAGENAME eq HD-Player.exe"], capture_output=True, text=True, errors="ignore")
-        emulator_running = "HD-Player.exe" in proc_check.stdout
+        proc_check = subprocess.run(["tasklist"], capture_output=True, text=True, errors="ignore")
+        emulator_running = "HD-Player.exe" in proc_check.stdout or "dnplayer.exe" in proc_check.stdout
     except:
         pass
         
