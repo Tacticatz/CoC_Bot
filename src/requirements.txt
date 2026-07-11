@@ -13,7 +13,6 @@ pillow
 portalocker
 pure-python-adb
 pyinstaller
-pyminitouch
 pywebview
 psutil
 rapidfuzz

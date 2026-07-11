@@ -1233,10 +1233,8 @@ class DeviceProxy:
 class ADB_Manager:
     import uiautomator2 as u2
     from adbutils import AdbDevice
-    from pyminitouch import MNTDevice
     
     _adbutils_device : AdbDevice | None = None
-    _minitouch_device : MNTDevice | None = None
     _uiautomator_device : u2.Device | None = None
 
     @classmethod
@@ -1259,7 +1257,6 @@ class ADB_Manager:
     def connect_once(cls, addr=None):
         import subprocess, adbutils, os
         import uiautomator2 as u2
-        from pyminitouch import MNTDevice
         
         if addr is None: addr = ADB_ADDRESS
         if ADB_ABS_DIR != "": os.environ["PATH"] = ADB_ABS_DIR + os.pathsep + os.environ["PATH"]
@@ -1272,22 +1269,13 @@ class ADB_Manager:
         devices = []
         try:
             d1 = adbutils.device(addr)
-            # Try to connect to minitouch, but fallback to None if it fails or hangs
-            d2 = None
-            try:
-                # Set a short timeout for minitouch setup to avoid freezing forever
-                d2 = MNTDevice(addr)
-                Exit_Handler.register(d2.stop)
-            except Exception as e:
-                if configs.DEBUG: print("[ADB_Manager] Minitouch connection bypassed (will use uiautomator2):", e)
-            
             d3 = u2.connect(addr)
-            devices = [d1, d2, d3]
+            devices = [d1, d3]
         except (KeyboardInterrupt, SystemExit): raise
         except:
             subprocess.run(["adb", "kill-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             raise Exception("Failed to get ADB device.")
-        cls._adbutils_device, cls._minitouch_device, cls._uiautomator_device = devices
+        cls._adbutils_device, cls._uiautomator_device = devices
 
     
     @classmethod
@@ -1312,11 +1300,6 @@ class ADB_Manager:
         return DeviceProxy(cls, "_adbutils_device")
 
     @classproperty
-    def minitouch_device(cls):
-        if cls._minitouch_device is None: cls.connect()
-        return DeviceProxy(cls, "_minitouch_device")
-
-    @classproperty
     def uiautomator_device(cls):
         if cls._uiautomator_device is None: cls.connect()
         return DeviceProxy(cls, "_uiautomator_device")
@@ -1325,7 +1308,6 @@ class Input_Handler:
     @classmethod
     def down(cls, x, y, pointer=0):
         import random
-        from pyminitouch import CommandBuilder
         if x < 0: x = 1 + x
         if y < 0: y = 1 + y
         
@@ -1333,33 +1315,15 @@ class Input_Handler:
         x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
         y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
 
-        if ADB_Manager._minitouch_device is None:
-            # Fallback to uiautomator2 (which doesn't support raw async down without pointer sessions easily, so we just tap)
-            ADB_Manager.uiautomator_device.touch.down(x * WINDOW_DIMS[0], y * WINDOW_DIMS[1])
-            return
-
-        MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
-        MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
-        x = int(x * MAX_X)
-        y = int(y * MAX_Y)
-        builder = CommandBuilder()
-        builder.down(pointer, x, y, 100)
-        builder.publish(ADB_Manager.minitouch_device.connection)
+        ADB_Manager.uiautomator_device.touch.down(x * WINDOW_DIMS[0], y * WINDOW_DIMS[1])
 
     @classmethod
     def up(cls, pointer=0):
-        if ADB_Manager._minitouch_device is None:
-            ADB_Manager.uiautomator_device.touch.up()
-            return
-        from pyminitouch import CommandBuilder
-        builder = CommandBuilder()
-        builder.up(pointer)
-        builder.publish(ADB_Manager.minitouch_device.connection)
+        ADB_Manager.uiautomator_device.touch.up()
 
     @classmethod
     def click(cls, x, y, n=1, delay=0, pointer=0):
         import time, random
-        from pyminitouch import CommandBuilder
         if x < 0: x = 1 + x
         if y < 0: y = 1 + y
         
@@ -1367,23 +1331,8 @@ class Input_Handler:
         x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
         y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
 
-        if ADB_Manager._minitouch_device is None:
-            # Stably tap using uiautomator2
-            for _ in range(n):
-                ADB_Manager.uiautomator_device.click(x, y)
-                time.sleep(delay)
-            return
-
-        MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
-        MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
-        x = int(x * MAX_X)
-        y = int(y * MAX_Y)
-        builder = CommandBuilder()
         for _ in range(n):
-            builder.down(pointer, x, y, 100)
-            builder.commit()
-            builder.up(pointer)
-            builder.publish(ADB_Manager.minitouch_device.connection)
+            ADB_Manager.uiautomator_device.click(x, y)
             time.sleep(delay)
 
     @classmethod
@@ -1392,20 +1341,15 @@ class Input_Handler:
 
     @classmethod
     def multi_click(cls, x1, y1, x2, y2, duration=0):
-        if ADB_Manager._minitouch_device is None:
-            # Sequential fallback taps
-            ADB_Manager.uiautomator_device.click(x1, y1)
-            time.sleep(duration / 1000)
-            ADB_Manager.uiautomator_device.click(x2, y2)
-            return
-        MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
-        MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
-        ADB_Manager.minitouch_device.tap([(x1*MAX_X, y1*MAX_Y), (x2*MAX_X, y2*MAX_Y)], duration=duration)
+        import time
+        # Sequential fallback taps since u2 doesn't do async multi-tap cleanly
+        ADB_Manager.uiautomator_device.click(x1, y1)
+        time.sleep(duration / 1000)
+        ADB_Manager.uiautomator_device.click(x2, y2)
 
     @classmethod
     def swipe(cls, x1, y1, x2, y2, duration=100, hold_end_time=0, inter_points=0, pointer=0):
-        import time, numpy as np, random
-        from pyminitouch import CommandBuilder
+        import time, random
         
         if x1 < 0: x1 = 1 + x1
         if y1 < 0: y1 = 1 + y1
@@ -1418,72 +1362,17 @@ class Input_Handler:
         x2 = max(0.0, min(1.0, x2 + random.gauss(0, 0.0015)))
         y2 = max(0.0, min(1.0, y2 + random.gauss(0, 0.0025)))
 
-        if ADB_Manager._minitouch_device is None:
-            # Swipe via uiautomator2
-            ADB_Manager.uiautomator_device.swipe(x1, y1, x2, y2, steps=max(5, int(duration / 20)))
-            if hold_end_time > 0:
-                time.sleep(hold_end_time / 1000)
-            return
-
-        MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
-        MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
-        
-        x1_px = int(x1 * MAX_X)
-        y1_px = int(y1 * MAX_Y)
-        x2_px = int(x2 * MAX_X)
-        y2_px = int(y2 * MAX_Y)
-        
-        if inter_points <= 0:
-            dist = np.hypot(x2_px - x1_px, y2_px - y1_px)
-            inter_points = max(5, int(dist / 20))
-            
-        # Draw a human-like Bezier curve rather than a perfectly straight line
-        mid_x = (x1_px + x2_px) / 2
-        mid_y = (y1_px + y2_px) / 2
-        dx = x2_px - x1_px
-        dy = y2_px - y1_px
-        length = np.hypot(dx, dy)
-        if length > 0:
-            perp_x = -dy / length
-            perp_y = dx / length
-            offset_magnitude = random.uniform(-0.04, 0.04) * length
-            ctrl_x = mid_x + perp_x * offset_magnitude
-            ctrl_y = mid_y + perp_y * offset_magnitude
-        else:
-            ctrl_x, ctrl_y = mid_x, mid_y
-
-        t = np.linspace(0, 1, inter_points + 2)
-        x_points = ((1 - t) ** 2 * x1_px + 2 * (1 - t) * t * ctrl_x + t ** 2 * x2_px).astype(int)
-        y_points = ((1 - t) ** 2 * y1_px + 2 * (1 - t) * t * ctrl_y + t ** 2 * y2_px).astype(int)
-        
-        builder = CommandBuilder()
-        builder.down(pointer, x1_px, y1_px, pressure=100)
-        builder.publish(ADB_Manager.minitouch_device.connection)
-        
-        # Calculate human-like step delay (acceleration and deceleration)
-        total_steps = inter_points + 1
-        time_steps = np.diff(np.sin(np.linspace(0, np.pi/2, total_steps + 1)))
-        time_steps = time_steps / np.sum(time_steps) * duration
-        
-        for i, (x, y) in enumerate(zip(x_points[1:], y_points[1:])):
-            builder.move(pointer, int(x), int(y), pressure=100)
-            builder.publish(ADB_Manager.minitouch_device.connection)
-            dt = time_steps[i]
-            dt = max(1, dt + random.uniform(-dt * 0.1, dt * 0.1))
-            time.sleep(dt / 1000)
-            
+        # Swipe via uiautomator2
+        ADB_Manager.uiautomator_device.swipe(x1, y1, x2, y2, steps=max(5, int(duration / 20)))
         if hold_end_time > 0:
-            time.sleep(max(0.001, (hold_end_time + random.uniform(-hold_end_time * 0.1, hold_end_time * 0.1)) / 1000))
-            
-        builder.up(pointer)
-        builder.publish(ADB_Manager.minitouch_device.connection)
+            time.sleep(hold_end_time / 1000)
 
     @classmethod
-    def swipe_up(cls, y1=0.5, y2=0.0, x=1.0, **kwargs):
+    def swipe_up(cls, x=0.5, y1=0.5, y2=0.0, **kwargs):
         cls.swipe(x, y1, x, y2, **kwargs)
 
     @classmethod
-    def swipe_down(cls, y1=0.5, y2=1.0, x=1.0, **kwargs):
+    def swipe_down(cls, x=0.5, y1=0.5, y2=1.0, **kwargs):
         cls.swipe(x, y1, x, y2, **kwargs)
 
     @classmethod
@@ -1496,39 +1385,11 @@ class Input_Handler:
 
     @classmethod
     def zoom(cls, dir="out", percent=1.0):
-        if ADB_Manager._minitouch_device is None:
-            # Fallback swipe to simulate zoom out/in via center swipes
-            if dir == "out":
-                ADB_Manager.uiautomator_device.swipe(0.4, 0.5, 0.15, 0.5, steps=10)
-            else:
-                ADB_Manager.uiautomator_device.swipe(0.15, 0.5, 0.4, 0.5, steps=10)
-            return
-
-        from pyminitouch import CommandBuilder
-        
-        builder = CommandBuilder()
-        
-        MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
-        MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
-        
-        left_in = to_int_array((0.15 + 0.30*percent)*MAX_X, 0.5*MAX_Y)
-        left_out = to_int_array(0.15*MAX_X, 0.5*MAX_Y)
-        right_in = to_int_array((0.85 - 0.30*percent)*MAX_X, 0.5*MAX_Y)
-        right_out = to_int_array(0.85*MAX_X, 0.5*MAX_Y)
-        
-        start = [left_in, right_in] if dir=="in" else [left_out, right_out]
-        end = [left_out, right_out] if dir=="in" else [left_in, right_in]
-        
-        builder.down(0, *start[0], pressure=100)
-        builder.down(1, *start[1], pressure=100)
-        builder.publish(ADB_Manager.minitouch_device.connection)
-        builder.move(0, *end[0], pressure=100)
-        builder.move(1, *end[1], pressure=100)
-        builder.commit()
-        builder.publish(ADB_Manager.minitouch_device.connection)
-        builder.up(0)
-        builder.up(1)
-        builder.publish(ADB_Manager.minitouch_device.connection)
+        # Fallback swipe to simulate zoom out/in via center swipes since u2 multi-touch is limited
+        if dir == "out":
+            ADB_Manager.uiautomator_device.swipe(0.4, 0.5, 0.15, 0.5, steps=10)
+        else:
+            ADB_Manager.uiautomator_device.swipe(0.15, 0.5, 0.4, 0.5, steps=10)
 
 
 class Frame_Handler:

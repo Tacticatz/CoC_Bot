@@ -29,11 +29,18 @@
 1. [Android Debug Bridge](https://developer.android.com/tools/releases/platform-tools)
     * Add to system path
         * Verify with: `adb --version`
-2. [BlueStacks](https://www.bluestacks.com/)
-    * Device profile: Samsung Galaxy S22 Ultra
-    * Display resolution: 1920 x 1080
-    * Frame rate: 60 (__NOTE__: Inconsistent touch events at lower fps)
-    * Enable Android Debug Bridge
+2. [BlueStacks 5/10](https://www.bluestacks.com/)
+    * **Recommended Settings for Windows 11 (Performance & Stability):**
+        * **Instance Type:** Pie 64-bit or Android 11
+        * **CPU / RAM Allocation:** 4 Cores, 4 GB Memory (High Performance)
+        * **Performance Mode:** High Performance
+        * **Display Resolution:** 1920 x 1080
+        * **Pixel Density:** 240 DPI (Crucial for image recognition)
+        * **Frame Rate:** 60 FPS (__NOTE__: Inconsistent touch events at lower fps)
+        * **Graphics Engine Mode:** Performance (Legacy)
+        * **Graphics Renderer:** OpenGL
+        * **ASTC Textures (Beta):** Hardware decoding (Highly recommended if you have a dedicated GPU)
+    * Enable Android Debug Bridge (in Advanced settings)
     * In Multi-Instance Manager, rename instances to match instance IDs in `configs.py` (the default ID is main, see steps 3 and 6 in [Custom Setup Instructions](#custom-setup-instructions-recommended) for more details)
     * Install Clash of Clans from Google Play
         * Default troop deployment size
