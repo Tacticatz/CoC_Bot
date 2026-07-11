@@ -872,12 +872,32 @@ class BlueStacks_Manager:
 
     @classmethod
     def stop(cls, timeout=60):
-        import time
+        import time, sys, subprocess
 
         if not cls.check():
-            if configs.DEBUG: print("BlueStacks stopped.")
+            if configs.DEBUG: print("BlueStacks already stopped.")
             return
-        ADB_Manager.adbutils_device.shell("reboot -p")
+
+        if sys.platform == "win32":
+            # Sauberer Prozess-Kill via taskkill statt "reboot -p" (welches BlueStacks crasht)
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "HD-Player.exe"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "HD-Agent.exe"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        elif sys.platform == "darwin":
+            subprocess.run(
+                ["pkill", "-x", "BlueStacks"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            raise Exception("Unsupported OS")
 
         start_time = time.time()
         while time.time() - start_time < timeout:

@@ -10,6 +10,8 @@ class CoC_Bot:
     def __init__(self):
         if configs.AUTO_START_BLUESTACKS:
             BlueStacks_Manager.init()
+            # stop() benötigt keine aktive ADB-Verbindung mehr (nutzt taskkill),
+            # aber start() muss BlueStacks hochfahren bevor connect() aufgerufen wird
             BlueStacks_Manager.restart()
         assert ADB_Manager.connect(60), "Failed to connect to ADB. Ensure BlueStacks is running and ADB is enabled."
         self.upgrader = Upgrader()
