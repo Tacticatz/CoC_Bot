@@ -502,7 +502,7 @@
             function updateLiveView() {
                 const img = document.getElementById("live-screen-img");
                 if (img.style.display !== "none") {
-                    img.src = `/${id}/screenshot?t=` + Date.now();
+                    img.src = `/instances/${id}/screenshot?t=` + Date.now();
                 }
             }
 
@@ -516,7 +516,7 @@
                 const y = (event.clientY - rect.top) / rect.height;
 
                 try {
-                    await fetch(`/${id}/click`, {
+                    await fetch(`/instances/${id}/click`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ x, y })
@@ -534,7 +534,7 @@
                 if (!text) return;
 
                 try {
-                    await fetch(`/${id}/type`, {
+                    await fetch(`/instances/${id}/type`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ text })
@@ -548,7 +548,7 @@
 
             async function sendRemoteKey(key) {
                 try {
-                    await fetch(`/${id}/keyevent`, {
+                    await fetch(`/instances/${id}/keyevent`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ key })
@@ -564,7 +564,7 @@
             
             async function updateBotProcessStatus() {
                 try {
-                    const res = await fetch(`/${id}/bot_status`);
+                    const res = await fetch(`/instances/${id}/bot_status`);
                     const data = await res.json();
                     botIsRunning = data.running;
                     
@@ -616,7 +616,7 @@
                 
                 const action = botIsRunning ? "stop_bot" : "start_bot";
                 try {
-                    const res = await fetch(`/${id}/${action}`, { method: "POST" });
+                    const res = await fetch(`/instances/${id}/${action}`, { method: "POST" });
                     if (res.ok) {
                         await updateBotProcessStatus();
                         updateBotLog();
@@ -633,7 +633,7 @@
 
             async function updateBotLog() {
                 try {
-                    const res = await fetch(`/${id}/bot_log`);
+                    const res = await fetch(`/instances/${id}/bot_log`);
                     const data = await res.json();
                     const consoleLog = document.getElementById("bot-console-log");
                     
