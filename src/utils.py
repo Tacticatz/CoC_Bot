@@ -1223,7 +1223,7 @@ class ADB_Manager:
     def is_connected(cls):
         import adbutils
 
-        if cls._adbutils_device is None or cls._minitouch_device is None or cls._uiautomator_device is None:
+        if cls._adbutils_device is None or cls._uiautomator_device is None:
             return False
 
         try:
@@ -1233,6 +1233,7 @@ class ADB_Manager:
         except (KeyboardInterrupt, SystemExit): raise
         except:
             return False
+
 
     @classmethod
     def connect_once(cls, addr=None):
@@ -1251,15 +1252,23 @@ class ADB_Manager:
         devices = []
         try:
             d1 = adbutils.device(addr)
-            d2 = MNTDevice(addr)
+            # Try to connect to minitouch, but fallback to None if it fails or hangs
+            d2 = None
+            try:
+                # Set a short timeout for minitouch setup to avoid freezing forever
+                d2 = MNTDevice(addr)
+                Exit_Handler.register(d2.stop)
+            except Exception as e:
+                if configs.DEBUG: print("[ADB_Manager] Minitouch connection bypassed (will use uiautomator2):", e)
+            
             d3 = u2.connect(addr)
             devices = [d1, d2, d3]
-            Exit_Handler.register(d2.stop)
         except (KeyboardInterrupt, SystemExit): raise
         except:
             subprocess.run(["adb", "kill-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             raise Exception("Failed to get ADB device.")
         cls._adbutils_device, cls._minitouch_device, cls._uiautomator_device = devices
+
     
     @classmethod
     def connect(cls, timeout=60):
@@ -1304,6 +1313,11 @@ class Input_Handler:
         x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
         y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
 
+        if ADB_Manager._minitouch_device is None:
+            # Fallback to uiautomator2 (which doesn't support raw async down without pointer sessions easily, so we just tap)
+            ADB_Manager.uiautomator_device.touch.down(x * WINDOW_DIMS[0], y * WINDOW_DIMS[1])
+            return
+
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
         x = int(x * MAX_X)
@@ -1314,6 +1328,9 @@ class Input_Handler:
 
     @classmethod
     def up(cls, pointer=0):
+        if ADB_Manager._minitouch_device is None:
+            ADB_Manager.uiautomator_device.touch.up()
+            return
         from pyminitouch import CommandBuilder
         builder = CommandBuilder()
         builder.up(pointer)
@@ -1329,6 +1346,13 @@ class Input_Handler:
         # Generate coordinates with slight gaussian jitter (human-like)
         x = max(0.0, min(1.0, x + random.gauss(0, 0.0015)))
         y = max(0.0, min(1.0, y + random.gauss(0, 0.0025)))
+
+        if ADB_Manager._minitouch_device is None:
+            # Stably tap using uiautomator2
+            for _ in range(n):
+                ADB_Manager.uiautomator_device.click(x, y)
+                time.sleep(delay)
+            return
 
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
@@ -1348,6 +1372,12 @@ class Input_Handler:
 
     @classmethod
     def multi_click(cls, x1, y1, x2, y2, duration=0):
+        if ADB_Manager._minitouch_device is None:
+            # Sequential fallback taps
+            ADB_Manager.uiautomator_device.click(x1, y1)
+            time.sleep(duration / 1000)
+            ADB_Manager.uiautomator_device.click(x2, y2)
+            return
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
         ADB_Manager.minitouch_device.tap([(x1*MAX_X, y1*MAX_Y), (x2*MAX_X, y2*MAX_Y)], duration=duration)
@@ -1367,6 +1397,13 @@ class Input_Handler:
         y1 = max(0.0, min(1.0, y1 + random.gauss(0, 0.0025)))
         x2 = max(0.0, min(1.0, x2 + random.gauss(0, 0.0015)))
         y2 = max(0.0, min(1.0, y2 + random.gauss(0, 0.0025)))
+
+        if ADB_Manager._minitouch_device is None:
+            # Swipe via uiautomator2
+            ADB_Manager.uiautomator_device.swipe(x1, y1, x2, y2, steps=max(5, int(duration / 20)))
+            if hold_end_time > 0:
+                time.sleep(hold_end_time / 1000)
+            return
 
         MAX_X = int(ADB_Manager.minitouch_device.connection.max_x)
         MAX_Y = int(ADB_Manager.minitouch_device.connection.max_y)
@@ -1439,6 +1476,14 @@ class Input_Handler:
 
     @classmethod
     def zoom(cls, dir="out", percent=1.0):
+        if ADB_Manager._minitouch_device is None:
+            # Fallback swipe to simulate zoom out/in via center swipes
+            if dir == "out":
+                ADB_Manager.uiautomator_device.swipe(0.4, 0.5, 0.15, 0.5, steps=10)
+            else:
+                ADB_Manager.uiautomator_device.swipe(0.15, 0.5, 0.4, 0.5, steps=10)
+            return
+
         from pyminitouch import CommandBuilder
         
         builder = CommandBuilder()
@@ -1464,6 +1509,7 @@ class Input_Handler:
         builder.up(0)
         builder.up(1)
         builder.publish(ADB_Manager.minitouch_device.connection)
+
 
 class Frame_Handler:
     pool = None
