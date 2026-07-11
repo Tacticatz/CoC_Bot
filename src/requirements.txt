@@ -20,3 +20,4 @@ rapidfuzz
 requests
 scipy
 uiautomator2
+python-dotenv

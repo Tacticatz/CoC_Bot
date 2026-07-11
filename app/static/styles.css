@@ -15,7 +15,9 @@
   --gold-hover: #ca8a04;
   --danger: #ef4444;
   --danger-hover: #dc2626;
+  --success: #10b981;
   --card-border: rgba(255, 255, 255, 0.08);
+
 }
 
 body {

@@ -138,6 +138,28 @@
                         </div>
                         <button type="submit" class="btn" style="width: 100%;"><i class="fas fa-copy"></i> Klonen & Registrieren</button>
                     </form>
+
+                    <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 20px 0;">
+
+                    <!-- Manual registration form -->
+                    <form id="add-instance-form" style="text-align: left;">
+                        <h3 style="margin-bottom: 10px; font-size: 1.2em;">Manuell hinzufügen</h3>
+                        <div class="form-row">
+                            <label for="manual_id">Instanz ID (z.B. main, account2)</label>
+                            <input type="text" id="manual_id" placeholder="Instanz ID" required>
+                        </div>
+                        <div class="flex-row">
+                            <div class="form-row">
+                                <label for="manual_adb">ADB Adresse</label>
+                                <input type="text" id="manual_adb" placeholder="127.0.0.1:5555" required>
+                            </div>
+                            <div class="form-row">
+                                <label for="manual_bs">BlueStacks Name (Optional)</label>
+                                <input type="text" id="manual_bs" placeholder="Pie64">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn" style="width: 100%;"><i class="fas fa-plus"></i> Hinzufügen</button>
+                    </form>
                 </div>
             </div>
 
@@ -188,10 +210,6 @@
                         <input type="checkbox" id="AUTO_CLAIM_SEASON_PASS">
                         <span>Silber-Pass Belohnungen automatisch abholen</span>
                     </label>
-                    <label class="config-checkbox-row">
-                        <input type="checkbox" id="USE_MAGIC_BOOKS">
-                        <span>Magische Buecher automatisch fuer Upgrades nutzen</span>
-                    </label>
                     
                     <button type="submit" class="btn" style="width: 100%; margin-top: 10px;"><i class="fas fa-save"></i> Einstellungen speichern</button>
                 </form>
@@ -236,7 +254,7 @@
                 const item = document.createElement("div");
                 item.className = "instance-item";
                 item.innerHTML = `
-                    <a href="/${id}" class="instance-link"><i class="fas fa-gamepad"></i> ${id} <span style="font-size: 11px; opacity: 0.6;">(${adbAddresses[id] || "5555"})</span></a>
+                    <a href="/instances/${id}" class="instance-link"><i class="fas fa-gamepad"></i> ${id} <span style="font-size: 11px; opacity: 0.6;">(${adbAddresses[id] || "5555"})</span></a>
                     <button class="btn btn-danger" onclick="deleteInstance('${id}')" style="padding: 6px 12px; font-size: 13px;"><i class="fas fa-trash-alt"></i> Loeschen</button>
                 `;
                 list.appendChild(item);
@@ -249,12 +267,13 @@
             });
         }
 
+
         function applySettings(settings) {
             // Apply checkbox values
             const checkboxes = [
                 "AUTO_START_BLUESTACKS", "UPGRADE_HEROES", "UPGRADE_HOME_BASE", 
                 "UPGRADE_HOME_LAB", "ATTACK_HOME_BASE", "ATTACK_BUILDER_BASE",
-                "AUTO_CLAIM_SEASON_PASS", "USE_MAGIC_BOOKS"
+                "AUTO_CLAIM_SEASON_PASS"
             ];
             checkboxes.forEach(key => {
                 if (settings[key] !== undefined) {
@@ -324,6 +343,37 @@
             }
         });
 
+        // Handle manual instance addition form submit
+        document.getElementById("add-instance-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id = document.getElementById("manual_id").value.trim().replaceAll(" ", "_");
+            const adb_address = document.getElementById("manual_adb").value.trim();
+            const bluestacks_name = document.getElementById("manual_bs").value.trim();
+
+            if (!id || !adb_address) return;
+
+            try {
+                const res = await fetch("/instances", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, adb_address, bluestacks_name })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Instanz "${id}" erfolgreich registriert!`);
+                    document.getElementById("manual_id").value = "";
+                    document.getElementById("manual_adb").value = "";
+                    document.getElementById("manual_bs").value = "";
+                    fetchDashboardData();
+                } else {
+                    alert("Registrierung fehlgeschlagen: " + (data.message || "Unbekannter Fehler"));
+                }
+            } catch (err) {
+                console.error("Registrierungsfehler:", err);
+                alert("Verbindungsfehler zum Server.");
+            }
+        });
+
         // Handle global settings form submit
         document.getElementById("global-settings-form").addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -337,9 +387,9 @@
                 UPGRADE_HOME_LAB: document.getElementById("UPGRADE_HOME_LAB").checked,
                 ATTACK_HOME_BASE: document.getElementById("ATTACK_HOME_BASE").checked,
                 ATTACK_BUILDER_BASE: document.getElementById("ATTACK_BUILDER_BASE").checked,
-                AUTO_CLAIM_SEASON_PASS: document.getElementById("AUTO_CLAIM_SEASON_PASS").checked,
-                USE_MAGIC_BOOKS: document.getElementById("USE_MAGIC_BOOKS").checked
+                AUTO_CLAIM_SEASON_PASS: document.getElementById("AUTO_CLAIM_SEASON_PASS").checked
             };
+
 
             try {
                 const res = await fetch("/api/settings", {

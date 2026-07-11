@@ -58,13 +58,11 @@ class Upgrader:
             Input_Handler.click_exit(3, 0.1)
 
     def _click_home_confirm(self, timeout=5):
-        success = click_with_timeout(
+        return click_with_timeout(
             lambda: Frame_Handler.locate(self.assets["confirm"], grayscale=False, thresh=0.85, use_cached=True),
             timeout=timeout
         )
-        if success:
-            self._check_and_use_book()
-        return success
+
 
     def _click_builder_confirm(self, timeout=5):
         return click_with_timeout(

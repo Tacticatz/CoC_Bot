@@ -1466,12 +1466,13 @@ class Input_Handler:
 class Frame_Handler:
     pool = None
     cached_frame = None
-    _last_upload_time = 0
-    
+    _last_frame_time = 0
+    _frame_cache_duration = 0.35  # Cache frames for 350ms to drastically reduce ADB/CPU load
+
     @classmethod
     def trigger_background_upload(cls, frame):
         import time, threading
-        if time.time() - cls._last_upload_time < 3.5:
+        if time.time() - cls._last_upload_time < 8.0:  # Reduced from 3.5s to 8s to prevent CPU spikes from JPEG compression
             return
         cls._last_upload_time = time.time()
         threading.Thread(target=cls._upload_frame_proc, args=(frame.copy(),), daemon=True).start()
@@ -1484,7 +1485,7 @@ class Frame_Handler:
             if not web_url:
                 return
             # Encode to low-quality JPEG to minimize network footprint
-            _, img_encoded = cv2.imencode('.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+            _, img_encoded = cv2.imencode('.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), 50])
             img_bytes = img_encoded.tobytes()
             requests.post(
                 f"{web_url}/{INSTANCE_ID}/screenshot_upload",
@@ -1518,17 +1519,29 @@ class Frame_Handler:
     
     @classmethod
     def get_frame(cls, grayscale=True, high_contrast=False, thresh=200, use_cached=False):
-        import cv2, numpy as np
-        if use_cached and cls.cached_frame is not None:
+        import cv2, numpy as np, time
+        
+        now = time.time()
+        # If cache is valid and requested or within 350ms duration, return cached frame to bypass ADB pull
+        if (use_cached or (now - cls._last_frame_time < cls._frame_cache_duration)) and cls.cached_frame is not None:
             frame = cls.cached_frame.copy()
         else:
-            try: frame = ADB_Manager.adbutils_device.framebuffer() # faster than screenshot but potentially unstable
-            except (KeyboardInterrupt, SystemExit): raise
-            except: frame = ADB_Manager.adbutils_device.screenshot()
+            try:
+                # Bypassing raw framebuffer() as it triggers the reconnect loop and high CPU usage.
+                # Standard adbutils screenshot() is more stable and robust.
+                frame = ADB_Manager.adbutils_device.screenshot()
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                # Backup fallback
+                frame = ADB_Manager.adbutils_device.screenshot()
+            
             frame = np.array(frame)[..., :3]
             frame = cv2.resize(frame, WINDOW_DIMS, interpolation=cv2.INTER_NEAREST)
             cls.cached_frame = frame.copy()
+            cls._last_frame_time = now
             cls.trigger_background_upload(frame)
+            
         if configs.DEBUG: cls.save_frame(frame, "debug/frame.png")
         if high_contrast: frame = cls.high_contrast(frame, thresh)
         elif grayscale: frame = cls.grayscale(frame)

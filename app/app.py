@@ -138,12 +138,13 @@ def check_auth():
         return
 
     # For API/AJAX endpoints, return 401 Unauthorized
-    api_paths = ["/running", "/status", "/exclude", "/notify", "/notifications", "/instances", "/screenshot_upload", "/screenshot"]
+    api_paths = ["/running", "/status", "/exclude", "/notify", "/notifications", "/screenshot_upload", "/screenshot"]
     if any(request.path.endswith(path) for path in api_paths):
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
     # Redirect UI visitors to login
     return redirect(url_for("login"))
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -270,8 +271,8 @@ def handle_instances():
     if request.method == "POST":
         data = request.json
         id = str(data.get("id", "")).strip()
-        adb = str(data.get("adb_address", "127.0.0.1:5555")).strip()
-        bs_name = str(data.get("bluestacks_name", "")).strip()
+        adb = str(data.get("adb_address", "") or data.get("adb", "127.0.0.1:5555")).strip()
+        bs_name = str(data.get("bluestacks_name", "") or data.get("bs_name", "")).strip()
         if id == "":
             return jsonify({"status": "error", "message": "Invalid ID"}), 400
         if id not in instances:
@@ -283,6 +284,7 @@ def handle_instances():
             instances[id].bluestacks_name = bs_name
             update_known_instances()
         return jsonify({"status": "success", "id": id})
+
 
     adb_addresses = {id: instances[id].adb_address for id in instances}
     return jsonify({
