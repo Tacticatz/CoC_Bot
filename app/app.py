@@ -185,7 +185,7 @@ def get_screenshot(id):
 def home():
     return render_template("home.html", ids=sorted(instances.keys()))
 
-@app.route("/<id>", methods=["GET"])
+@app.route("/instances/<id>", methods=["GET"])
 def handle_instance(id):
     instance = instances.get(id)
     if not instance: abort(404)
@@ -203,7 +203,7 @@ def handle_instance(id):
 def handle_current_time():
     return {"current_time": time.time()}
 
-@app.route("/<id>/end_time", methods=["GET", "POST"])
+@app.route("/instances/<id>/end_time", methods=["GET", "POST"])
 def handle_end_time(id):
     global instances
     instance = instances.get(id)
@@ -215,13 +215,13 @@ def handle_end_time(id):
     
     return {"end_time": instance.end_time}
 
-@app.route("/<id>/running", methods=["GET"])
+@app.route("/instances/<id>/running", methods=["GET"])
 def handle_running(id):
     instance = instances.get(id)
     if not instance: abort(404)
     return {"running": instance.end_time == 0 or instance.end_time < time.time()}
 
-@app.route("/<id>/status", methods=["GET", "POST"])
+@app.route("/instances/<id>/status", methods=["GET", "POST"])
 def handle_status(id):
     global instances
     instance = instances.get(id)
@@ -233,7 +233,7 @@ def handle_status(id):
 
     return {"status": instance.run_status}
 
-@app.route("/<id>/exclude", methods=["GET", "POST"])
+@app.route("/instances/<id>/exclude", methods=["GET", "POST"])
 def handle_exclude(id):
     global instances
     instance = instances.get(id)
@@ -248,7 +248,7 @@ def handle_exclude(id):
             instance.exclusions.discard(item)
     return {"exclusions": sorted(list(instance.exclusions))}
 
-@app.route("/<id>/notify", methods=["POST"])
+@app.route("/instances/<id>/notify", methods=["POST"])
 def handle_notify(id):
     global instances
     data = request.json
@@ -257,7 +257,7 @@ def handle_notify(id):
     instance.add_notification(data)
     return jsonify({"status": "success", "received": data})
 
-@app.route("/<id>/notifications", methods=["POST"])
+@app.route("/instances/<id>/notifications", methods=["POST"])
 def handle_notifications(id):
     n = request.json
     instance = instances.get(id)
