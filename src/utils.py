@@ -5,13 +5,15 @@ from functools import lru_cache
 # Human-like sleep monkey patch for anti-detection
 import time as _time
 import random as _random
+_original_sleep = _time.sleep
 def _stealth_sleep(seconds):
     if seconds > 0.05:
         # Add up to 12% random variance to simulate human inconsistency
         jitter = _random.uniform(-seconds * 0.12, seconds * 0.12)
         seconds = max(0.005, seconds + jitter)
-    _time.sleep(seconds)
+    _original_sleep(seconds)
 _time.sleep = _stealth_sleep
+
 
 try:
     import configs
